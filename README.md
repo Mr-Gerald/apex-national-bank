@@ -1,14 +1,18 @@
-# Run and deploy your AI Studio app
+# Apex National Bank
 
-This contains everything you need to run your app locally.
+Frontend interface for Apex National Bank dashboard using React and Vite.
 
-## Run Locally
+---
 
-**Prerequisites:**  Node.js
+## 🚀 Run Locally
 
+**Prerequisites:**
+- Node.js installed on your system
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 🛠️ Setup Instructions
+
+1. **Clone this repository:**
+
+   ```bash
+   git clone https://github.com/Mr-Gerald/apex-national-bank.git
+   cd apex-national-bank

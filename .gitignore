@@ -1,4 +1,4 @@
-# Logs
+# Logs and debugging
 logs
 *.log
 npm-debug.log*
@@ -7,18 +7,73 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Dependencies and builds
+node_modules/
+dist/
+dist-ssr/
+build/
+.build/
+.cache/
+.parcel-cache/
+.nuxt/
+.next/
+out/
 
-# Editor directories and files
+# Environment files
+.env
+.env.*
+!.env.example
+.env.local
+
+# Vite logs
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Editor and IDE files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing and coverage
+.nyc_output/
+coverage/
+*.lcov
+
+# Yarn & npm
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.yarn-integrity
+
+# Others
+bower_components/
+jspm_packages/
+web_modules/
+lib-cov/
+node-waf/
+report.*
+*.pid
+*.seed
+*.pid.lock
+*.tgz
+.grunt/
+.docusaurus/
+.serverless/
+.fusebox/
+.dynamodb/
+.firebase/
+.tern-port
+.vscode-test/
