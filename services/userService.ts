@@ -89,9 +89,9 @@ export const updateUserById = async (userId: string, updatedData: Partial<User>)
 
 
 // --- Authentication ---
-export const loginUser = async (email_input: string, password_input: string, ipAddress: string, deviceAgent: string): Promise<User> => {
-    // This function is now a proxy to the secure backend endpoint
-    const user = await api.login(email_input, password_input, ipAddress, deviceAgent);
+export const loginUser = async (username_input: string, password_input: string, ipAddress: string, deviceAgent: string): Promise<User> => {
+    // This function is a proxy to the secure backend login endpoint.
+    const user = await api.login(username_input, password_input, ipAddress, deviceAgent);
     await api.saveCurrentUserId(user.id);
     return user;
 };
@@ -103,57 +103,10 @@ export const registerUser = async (
     ipAddress: string, 
     deviceAgent: string
 ): Promise<User> => {
-    let users = await getUsersFromStorage();
-    if (users.find(u => u.username.toLowerCase() === username_input.toLowerCase())) {
-        throw new Error("Username already exists.");
-    }
-    if (users.find(u => u.email.toLowerCase() === profileData.email.toLowerCase())) {
-        throw new Error("Email already registered.");
-    }
-
-    const newUserId = `user${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    const initialAccounts = generateInitialAccountsForNewUser(newUserId);
-    
-    const newUser: User = {
-        id: newUserId,
-        username: username_input,
-        hashedPassword: password_plain, 
-        ...profileData, 
-        profileImageUrl: undefined,
-        ssn: undefined,
-        phoneCarrier: undefined,
-        occupation: undefined,
-        maritalStatus: undefined,
-        createdAt: new Date().toISOString(),
-        accounts: initialAccounts,
-        linkedExternalAccounts: [],
-        linkedCards: [],
-        savingsGoals: [],
-        payees: [],
-        scheduledPayments: [],
-        apexCards: [],
-        isIdentityVerified: false,
-        verificationSubmission: undefined,
-        notifications: [{
-            id: generateAccountServiceId(),
-            message: `Welcome to ${BANK_NAME}, ${profileData.fullName}! We're glad to have you.`,
-            date: new Date().toISOString(),
-            read: false,
-            type: 'general'
-        }],
-        notificationPreferences: { ...defaultNotificationPreferencesScoped },
-        travelNotices: [],
-        lastPasswordChange: undefined,
-        securitySettings: { ...defaultSecuritySettingsScoped },
-        securityQuestions: [],
-        loginHistory: [{id: generateAccountServiceId(), timestamp: new Date().toISOString(), ipAddress, status: "Success", deviceInfo: deviceAgent}],
-        recognizedDevices: [{id: generateAccountServiceId(), name: `Device (${deviceAgent.substring(0,20)}...)`, lastLogin: new Date().toISOString(), ipAddress, userAgent: deviceAgent}],
-        isAdmin: false,
-    };
-    users.push(newUser);
-    await saveUsersToStorage(users);
-    await _logSensitiveData("USER_REGISTERED", { userId: newUser.id, username: newUser.username, email: newUser.email });
-    return { ...newUser };
+    // This function is a proxy to the secure backend register endpoint.
+    const newUser = await api.register(username_input, password_plain, profileData, ipAddress, deviceAgent);
+    await _logSensitiveData("USER_REGISTERED_VIA_API", { userId: newUser.id, username: newUser.username, email: newUser.email });
+    return newUser;
 };
 
 export const logoutUser = async (): Promise<void> => {

@@ -11,7 +11,7 @@ import {
 } from '../constants';
 
 const LoginScreen: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const { login, authError } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -22,7 +22,7 @@ const LoginScreen: React.FC = () => {
     try {
       // The login function triggers a state change in AuthContext.
       // A useEffect hook in App.tsx now handles all redirection logic.
-      await login(email, password);
+      await login(username, password);
     } catch (error) {
       console.error("Login attempt failed:", error);
       // authError is already set by the login function in AuthContext
@@ -55,15 +55,15 @@ const LoginScreen: React.FC = () => {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email"className="block text-sm font-medium text-neutral-700">Email Address</label>
+              <label htmlFor="username"className="block text-sm font-medium text-neutral-700">Username or Email</label>
               <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="mt-1 w-full p-2.5 border border-neutral-300 rounded-md text-sm focus:ring-primary focus:border-primary"
                 required
-                aria-label="Email Address"
+                aria-label="Username or Email"
               />
             </div>
             <div>

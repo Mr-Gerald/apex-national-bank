@@ -1,4 +1,4 @@
-import { User } from '../types';
+import { User, UserProfileData } from '../types';
 
 // Determine base API URL based on the hostname.
 // This allows the app to work seamlessly in both local development and production on Vercel.
@@ -29,11 +29,20 @@ const handleResponse = async (response: Response) => {
     }
 };
 
-export const login = async (email: string, password_input: string, ipAddress: string, deviceAgent: string): Promise<User> => {
+export const login = async (username: string, password_input: string, ipAddress: string, deviceAgent: string): Promise<User> => {
     const response = await fetch(`${BASE_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, password: password_input, ipAddress, deviceAgent }),
+        body: JSON.stringify({ username: username, password: password_input, ipAddress, deviceAgent }),
+    });
+    return handleResponse(response);
+};
+
+export const register = async (username: string, password_plain: string, profileData: Omit<UserProfileData, 'profileImageUrl' | 'ssn' | 'phoneCarrier'>, ipAddress: string, deviceAgent: string): Promise<User> => {
+    const response = await fetch(`${BASE_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password_plain, ...profileData, ipAddress, deviceAgent }),
     });
     return handleResponse(response);
 };

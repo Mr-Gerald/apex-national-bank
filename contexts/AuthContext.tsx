@@ -51,7 +51,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isLoading: boolean;
   isLoginTransition: boolean;
-  login: (email?: string, password?: string) => Promise<void>;
+  login: (username?: string, password?: string) => Promise<void>;
   register: (username: string, password_plain: string, profileData: Omit<UserProfileData, 'profileImageUrl'| 'ssn' | 'phoneCarrier'>) => Promise<User>;
   requestLogout: () => void;
   executeLogout: () => Promise<void>;
@@ -158,15 +158,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const login = async (email_input?: string, password_input?: string) => {
+  const login = async (username_input?: string, password_input?: string) => {
     setAuthError(null);
-    if (!email_input || !password_input) { 
+    if (!username_input || !password_input) { 
         throw new Error("No credentials provided.");
     }
     try {
       const ipAddress = "0.0.0.0"; 
       const deviceAgent = navigator.userAgent;
-      const loggedInUser = await loginUserService(email_input, password_input, ipAddress, deviceAgent);
+      const loggedInUser = await loginUserService(username_input, password_input, ipAddress, deviceAgent);
       
       setIsLoginTransition(true); // Show loading screen
 
