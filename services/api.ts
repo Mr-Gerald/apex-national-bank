@@ -1,7 +1,6 @@
+
 import { User, UserProfileData } from '../types';
 
-// Determine base API URL based on the hostname.
-// This allows the app to work seamlessly in both local development and production on Vercel.
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const API_URL = isLocalhost ? 'http://localhost:3001' : 'https://apex-backend.onrender.com';
 const BASE_URL = `${API_URL}/api`;
@@ -20,7 +19,7 @@ const handleResponse = async (response: Response) => {
     }
     const text = await response.text();
     if (!text) {
-        return; // For 204 No Content responses
+        return; 
     }
     try {
         return JSON.parse(text);

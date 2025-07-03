@@ -55,6 +55,7 @@ const generateInitialAccountsForNewUser = (userIdPrefix) => {
     ];
 };
 
+
 // --- Database Interaction Helpers ---
 const readDb = () => {
     try {
@@ -62,14 +63,7 @@ const readDb = () => {
             console.log(`Database file not found at ${DB_FILE}. Creating a new one.`);
             fs.writeFileSync(DB_FILE, JSON.stringify({ users: [], dbLog: [] }, null, 2));
         }
-        
         const data = fs.readFileSync(DB_FILE, 'utf-8');
-        
-        if (data.trim() === '') {
-            console.log('Database file is empty. Initializing with default structure.');
-            return { users: [], dbLog: [] };
-        }
-        
         return JSON.parse(data);
     } catch (error) {
         console.error(`Critical Error reading or parsing ${DB_FILE}:`, error);
@@ -89,36 +83,25 @@ const writeDb = (data) => {
 
 // Root endpoint for deployment status check
 app.get('/', (req, res) => {
-    res.status(200).send(`Apex National Bank Backend is running. Last updated: ${new Date().toISOString()}`);
+    res.status(200).send(`Apex National Bank Backend is running. This is the latest version.`);
 });
 
 app.get('/api', (req, res) => {
-    res.status(200).json({ 
-        message: 'Apex National Bank API is running.',
-        available_endpoints: [
-            'GET /api/users', 'POST /api/users',
-            'GET /api/dblog', 'POST /api/dblog',
-            'POST /api/login', 'POST /api/register'
-        ]
-    });
+    res.status(200).json({ message: 'Apex National Bank API is running.' });
 });
 
-// User data endpoints
 app.get('/api/users', (req, res) => {
-    console.log(`[${new Date().toISOString()}] GET /api/users`);
     const db = readDb();
     res.json(db.users || []);
 });
 
 app.post('/api/users', (req, res) => {
-    console.log(`[${new Date().toISOString()}] POST /api/users`);
     let db = readDb();
     db.users = req.body;
     writeDb(db);
     res.status(200).json({ message: 'Users saved successfully' });
 });
 
-// Log endpoints
 app.get('/api/dblog', (req, res) => {
     const db = readDb();
     res.json(db.dbLog || []);
@@ -131,19 +114,18 @@ app.post('/api/dblog', (req, res) => {
     res.status(200).json({ message: 'Log saved successfully' });
 });
 
-// LOGIN Endpoint - Final, resilient version
+// LOGIN Endpoint - Final, simplified, and robust version
 app.post('/api/login', (req, res) => {
-    const { username, name, email, password, ipAddress, deviceAgent } = req.body;
-    const loginIdentifier = username || name || email;
+    const { username, password } = req.body;
 
-    if (!loginIdentifier || !password) {
-        return res.status(400).json({ message: 'Login identifier (username/email) and password are required.' });
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required.' });
     }
 
     const db = readDb();
     const user = db.users.find(u => 
-        (u.username && u.username.toLowerCase() === loginIdentifier.toLowerCase()) ||
-        (u.email && u.email.toLowerCase() === loginIdentifier.toLowerCase())
+        (u.username && u.username.toLowerCase() === username.toLowerCase()) ||
+        (u.email && u.email.toLowerCase() === username.toLowerCase())
     );
 
     if (!user) {
@@ -154,12 +136,11 @@ app.post('/api/login', (req, res) => {
         return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    // Handle successful login (logging, etc.)
     const { hashedPassword, ...userToReturn } = user;
     res.status(200).json(userToReturn);
 });
 
-// REGISTER Endpoint - Final version
+// REGISTER Endpoint - Final corrected version
 app.post('/api/register', (req, res) => {
     const { username, password_plain, fullName, email, ...rest } = req.body;
 
@@ -191,7 +172,6 @@ app.post('/api/register', (req, res) => {
         accounts: generateInitialAccountsForNewUser(newUserId),
         isIdentityVerified: false,
         isAdmin: false,
-        // Initialize all other user fields to empty/default states
         linkedCards: [],
         linkedExternalAccounts: [],
         savingsGoals: [],
@@ -223,5 +203,5 @@ app.post('/api/register', (req, res) => {
 // --- Server Initialization ---
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Apex Bank backend server is running on port: ${PORT}`);
-    readDb(); // Initialize DB file if it doesn't exist on startup
+    readDb();
 });
