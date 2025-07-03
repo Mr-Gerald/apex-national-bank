@@ -1,3 +1,4 @@
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -44,6 +45,25 @@ const writeDb = (data) => {
 };
 
 // --- API Endpoints ---
+
+app.get('/', (req, res) => {
+    res.status(200).send('Apex National Bank Backend is running. Welcome!');
+});
+
+app.get('/api', (req, res) => {
+    res.status(200).json({ 
+        message: 'Apex National Bank API is running.',
+        available_endpoints: [
+            'GET /api/users',
+            'POST /api/users',
+            'GET /api/dblog',
+            'POST /api/dblog',
+            'POST /api/login'
+        ]
+    });
+});
+
+
 app.get('/api/users', (req, res) => {
     console.log(`[${new Date().toISOString()}] GET /api/users`);
     const db = readDb();
@@ -74,14 +94,22 @@ app.post('/api/dblog', (req, res) => {
 
 app.post('/api/login', (req, res) => {
     console.log(`[${new Date().toISOString()}] POST /api/login`);
-    const { email, password, ipAddress, deviceAgent } = req.body;
+    const { email, name, password, ipAddress, deviceAgent } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({ message: '"email" and "password" are required.' });
+    // Use email as the primary identifier, but fall back to 'name' if email is not provided.
+    // This makes the endpoint robust to frontend changes or inconsistencies.
+    const loginIdentifier = email || name;
+
+    if (!loginIdentifier || !password) {
+        return res.status(400).json({ message: 'Login identifier (email or username) and password are required.' });
     }
 
     const db = readDb();
-    const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    // Find user by either email or username, case-insensitively.
+    const user = db.users.find(u => 
+        (u.email && u.email.toLowerCase() === loginIdentifier.toLowerCase()) || 
+        (u.username && u.username.toLowerCase() === loginIdentifier.toLowerCase())
+    );
 
     if (!user) {
         return res.status(404).json({ message: 'User not found.' });
@@ -93,7 +121,7 @@ app.post('/api/login', (req, res) => {
             user.loginHistory = [failedLoginAttempt, ...(user.loginHistory || [])].slice(0,20);
             writeDb(db);
         }
-        return res.status(401).json({ message: 'Invalid email or password.' });
+        return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
     // --- Handle successful login ---
