@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -75,14 +74,14 @@ app.post('/api/dblog', (req, res) => {
 
 app.post('/api/login', (req, res) => {
     console.log(`[${new Date().toISOString()}] POST /api/login`);
-    const { username, password, ipAddress, deviceAgent } = req.body;
+    const { name, password, ipAddress, deviceAgent } = req.body;
 
-    if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required.' });
+    if (!name || !password) {
+        return res.status(400).json({ message: '"name" and "password" are required.' });
     }
 
     const db = readDb();
-    const user = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    const user = db.users.find(u => u.username.toLowerCase() === name.toLowerCase());
 
     if (!user) {
         return res.status(404).json({ message: 'User not found.' });
