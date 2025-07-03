@@ -51,7 +51,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isLoading: boolean;
   isLoginTransition: boolean;
-  login: (username?: string, password?: string) => Promise<void>;
+  login: (username_input?: string, password?: string) => Promise<void>;
   register: (username: string, password_plain: string, profileData: Omit<UserProfileData, 'profileImageUrl'| 'ssn' | 'phoneCarrier'>) => Promise<User>;
   requestLogout: () => void;
   executeLogout: () => Promise<void>;
