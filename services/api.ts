@@ -1,3 +1,4 @@
+
 import { User } from '../types';
 
 // Determine base API URL based on the hostname.
@@ -28,6 +29,16 @@ const handleResponse = async (response: Response) => {
         return text;
     }
 };
+
+export const login = async (username: string, password_input: string, ipAddress: string, deviceAgent: string): Promise<User> => {
+    const response = await fetch(`${BASE_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password: password_input, ipAddress, deviceAgent }),
+    });
+    return handleResponse(response);
+};
+
 
 export const fetchAllUsers = async (): Promise<User[]> => {
     try {

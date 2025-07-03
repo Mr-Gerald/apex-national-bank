@@ -53,7 +53,7 @@ app.get('/api/users', (req, res) => {
 
 app.post('/api/users', (req, res) => {
     console.log(`[${new Date().toISOString()}] POST /api/users`);
-    const db = readDb();
+    let db = readDb();
     db.users = req.body;
     writeDb(db);
     res.status(200).json({ message: 'Users saved successfully' });
@@ -67,11 +67,58 @@ app.get('/api/dblog', (req, res) => {
 
 app.post('/api/dblog', (req, res) => {
     console.log(`[${new Date().toISOString()}] POST /api/dblog`);
-    const db = readDb();
+    let db = readDb();
     db.dbLog = req.body;
     writeDb(db);
     res.status(200).json({ message: 'Log saved successfully' });
 });
+
+app.post('/api/login', (req, res) => {
+    console.log(`[${new Date().toISOString()}] POST /api/login`);
+    const { username, password, ipAddress, deviceAgent } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required.' });
+    }
+
+    const db = readDb();
+    const user = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+
+    if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
+    }
+
+    if (user.hashedPassword !== password) {
+         if(!user.isAdmin) {
+            const failedLoginAttempt = { id: `log-${Date.now()}`, timestamp: new Date().toISOString(), ipAddress, status: "Failed - Incorrect Password", deviceInfo: deviceAgent };
+            user.loginHistory = [failedLoginAttempt, ...(user.loginHistory || [])].slice(0,20);
+            writeDb(db);
+        }
+        return res.status(401).json({ message: 'Invalid username or password.' });
+    }
+
+    // --- Handle successful login ---
+    if(!user.isAdmin) {
+        const successfulLoginAttempt = { id: `log-${Date.now()}`, timestamp: new Date().toISOString(), ipAddress, status: "Success", deviceInfo: deviceAgent };
+        user.loginHistory = [successfulLoginAttempt, ...(user.loginHistory || [])].slice(0,20);
+
+        const existingDeviceIndex = user.recognizedDevices?.findIndex(d => d.userAgent === deviceAgent && d.ipAddress.split('.').slice(0,3).join('.') === ipAddress.split('.').slice(0,3).join('.'));
+
+        if (existingDeviceIndex > -1 && user.recognizedDevices) {
+            user.recognizedDevices[existingDeviceIndex].lastLogin = new Date().toISOString();
+            user.recognizedDevices[existingDeviceIndex].ipAddress = ipAddress;
+        } else if (!user.recognizedDevices?.some(d=> d.name.includes("Device") && d.userAgent === deviceAgent ) ) { 
+             const newDevice = { id: `dev-${Date.now()}`, name: `Device (${deviceAgent.substring(0,20)}...)`, lastLogin: new Date().toISOString(), ipAddress, userAgent: deviceAgent };
+            user.recognizedDevices = [newDevice, ...(user.recognizedDevices || [])].slice(0,5);
+        }
+        writeDb(db);
+    }
+    
+    // Don't send the password back to the client
+    const { hashedPassword, ...userToReturn } = user;
+    res.status(200).json(userToReturn);
+});
+
 
 // --- Server Initialization ---
 app.listen(PORT, () => {
