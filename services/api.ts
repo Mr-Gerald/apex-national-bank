@@ -29,11 +29,11 @@ const handleResponse = async (response: Response) => {
     }
 };
 
-export const login = async (username: string, password_input: string, ipAddress: string, deviceAgent: string): Promise<User> => {
+export const login = async (email: string, password_input: string, ipAddress: string, deviceAgent: string): Promise<User> => {
     const response = await fetch(`${BASE_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: username, password: password_input, ipAddress, deviceAgent }),
+        body: JSON.stringify({ email: email, password: password_input, ipAddress, deviceAgent }),
     });
     return handleResponse(response);
 };

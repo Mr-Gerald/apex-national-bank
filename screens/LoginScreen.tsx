@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
@@ -10,33 +11,18 @@ import {
 } from '../constants';
 
 const LoginScreen: React.FC = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { login, authError } = useAuth();
-  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    if (username === 'Admin' && password === 'Apex&77') {
-        try {
-            await login(username, password); 
-            sessionStorage.setItem('isAdmin', 'true');
-            navigate('/admin/dashboard');
-        } catch (adminLoginError) {
-            console.error("Admin login sequence error:", adminLoginError);
-            // authError will be set by login function if admin login fails in service
-        } finally {
-            setIsLoading(false);
-        }
-        return;
-    }
-
     try {
-      await login(username, password);
-      navigate('/loading-dashboard'); 
+      // The login function triggers a state change in AuthContext.
+      // A useEffect hook in App.tsx now handles all redirection logic.
+      await login(email, password);
     } catch (error) {
       console.error("Login attempt failed:", error);
       // authError is already set by the login function in AuthContext
@@ -69,15 +55,15 @@ const LoginScreen: React.FC = () => {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="username"className="block text-sm font-medium text-neutral-700">Username</label>
+              <label htmlFor="email"className="block text-sm font-medium text-neutral-700">Email Address</label>
               <input
-                type="text"
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 w-full p-2.5 border border-neutral-300 rounded-md text-sm focus:ring-primary focus:border-primary"
                 required
-                aria-label="Username"
+                aria-label="Email Address"
               />
             </div>
             <div>

@@ -74,14 +74,14 @@ app.post('/api/dblog', (req, res) => {
 
 app.post('/api/login', (req, res) => {
     console.log(`[${new Date().toISOString()}] POST /api/login`);
-    const { name, password, ipAddress, deviceAgent } = req.body;
+    const { email, password, ipAddress, deviceAgent } = req.body;
 
-    if (!name || !password) {
-        return res.status(400).json({ message: '"name" and "password" are required.' });
+    if (!email || !password) {
+        return res.status(400).json({ message: '"email" and "password" are required.' });
     }
 
     const db = readDb();
-    const user = db.users.find(u => u.username.toLowerCase() === name.toLowerCase());
+    const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
     if (!user) {
         return res.status(404).json({ message: 'User not found.' });
@@ -93,7 +93,7 @@ app.post('/api/login', (req, res) => {
             user.loginHistory = [failedLoginAttempt, ...(user.loginHistory || [])].slice(0,20);
             writeDb(db);
         }
-        return res.status(401).json({ message: 'Invalid username or password.' });
+        return res.status(401).json({ message: 'Invalid email or password.' });
     }
 
     // --- Handle successful login ---

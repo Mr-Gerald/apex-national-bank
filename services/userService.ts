@@ -1,4 +1,5 @@
 
+
 import { User, UserProfileData, Account, AccountType, Transaction, TransactionType, LinkedExternalAccount, LinkedCard, SavingsGoal, AppNotification, VerificationSubmissionData, UserNotificationPreferences, TravelNotice, SecuritySettings, SecurityQuestionAnswer, LoginAttempt, DeviceInfo, TransactionStatus, PREDEFINED_SECURITY_QUESTIONS, VerificationSubmissionStatus, Payee, ScheduledPayment, ApexCard } from '../types';
 import * as api from './api';
 import { BANK_NAME } from '../constants';
@@ -88,9 +89,9 @@ export const updateUserById = async (userId: string, updatedData: Partial<User>)
 
 
 // --- Authentication ---
-export const loginUser = async (username_input: string, password_input: string, ipAddress: string, deviceAgent: string): Promise<User> => {
+export const loginUser = async (email_input: string, password_input: string, ipAddress: string, deviceAgent: string): Promise<User> => {
     // This function is now a proxy to the secure backend endpoint
-    const user = await api.login(username_input, password_input, ipAddress, deviceAgent);
+    const user = await api.login(email_input, password_input, ipAddress, deviceAgent);
     await api.saveCurrentUserId(user.id);
     return user;
 };
