@@ -6,7 +6,8 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = 3001;
+// Use the port provided by the environment (for Render) or 3001 for local dev
+const PORT = process.env.PORT || 3001;
 const DB_FILE = path.join(__dirname, 'database.json');
 
 // --- Middleware ---
@@ -74,6 +75,6 @@ app.post('/api/dblog', (req, res) => {
 
 // --- Server Initialization ---
 app.listen(PORT, () => {
-    console.log(`Apex Bank backend server is running on http://localhost:${PORT}`);
+    console.log(`Apex Bank backend server is running on port: ${PORT}`);
     readDb(); // Initialize DB on startup
 });
