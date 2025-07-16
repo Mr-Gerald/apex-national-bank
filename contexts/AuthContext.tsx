@@ -1,9 +1,7 @@
 
 
-
-
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { User, UserProfileData, Account, AccountType, LinkedExternalAccount, LinkedCard, SavingsGoal, Transaction, AppNotification, VerificationSubmissionData, UserNotificationPreferences, TravelNotice, SecuritySettings, SecurityQuestionAnswer, LoginAttempt, DeviceInfo, TransactionStatus, PREDEFINED_SECURITY_QUESTIONS, VerificationSubmissionStatus, Payee, ScheduledPayment, ApexCard, WireTransferDetails } from '../types';
+import { User, UserProfileData, Account, AccountType, LinkedExternalAccount, LinkedCard, SavingsGoal, Transaction, AppNotification, VerificationSubmissionData, UserNotificationPreferences, TravelNotice, SecuritySettings, SecurityQuestionAnswer, LoginAttempt, DeviceInfo, TransactionStatus, PREDEFINED_SECURITY_QUESTIONS, VerificationSubmissionStatus, Payee, ScheduledPayment, ApexCard } from '../types';
 import * as api from '../services/api';
 import {
     loginUser as loginUserService,
@@ -45,7 +43,7 @@ import {
     addScheduledPaymentToUser,
     cancelScheduledPaymentForUser,
     updateApexCardInUserList,
-    initiateAchWireTransfer as initiateAchWireTransferService
+    initiateWireTransfer as initiateWireTransferService
 } from '../services/userService';
 
 interface AuthContextType {
@@ -103,7 +101,7 @@ interface AuthContextType {
   addScheduledPayment: (paymentData: Omit<ScheduledPayment, 'id'|'status'>) => Promise<void>;
   cancelScheduledPayment: (paymentId: string) => Promise<void>;
   updateApexCard: (updatedCard: ApexCard) => Promise<void>;
-  initiateAchWireTransfer: (fromAccountId: string, details: WireTransferDetails) => Promise<string>;
+  initiateWireTransfer: (fromAccountId: string, amount: number, recipientName: string, memo: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -565,12 +563,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const updatedUser = await updateApexCardInUserList(user.id, updatedCard);
         setUser(updatedUser);
     };
-    
-    const initiateAchWireTransfer = async (fromAccountId: string, details: WireTransferDetails): Promise<string> => {
+
+    const initiateWireTransfer = async (fromAccountId: string, amount: number, recipientName: string, memo: string) => {
         if (!user) throw new Error("User not authenticated.");
-        const newTxId = await initiateAchWireTransferService(user.id, fromAccountId, details);
-        await fetchLatestUserData(); // Refresh user state after the service call
-        return newTxId;
+        try {
+            const updatedUser = await initiateWireTransferService(user.id, fromAccountId, amount, recipientName, memo);
+            setUser(updatedUser);
+        } catch (error: any) {
+            setAuthError(error.message || "Failed to initiate wire transfer.");
+            throw error;
+        }
     };
 
 
@@ -598,7 +600,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         fetchAllUsersForAdmin, updateUserByAdmin, sendNotificationFromAdmin, adminMarkUserVerified,
         // New functions
         addPayee, updatePayee, deletePayee, addScheduledPayment, cancelScheduledPayment, updateApexCard,
-        initiateAchWireTransfer
+        initiateWireTransfer
      }}>
       {children}
     </AuthContext.Provider>
