@@ -1,5 +1,6 @@
 
 
+
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User, UserProfileData, Account, AccountType, LinkedExternalAccount, LinkedCard, SavingsGoal, Transaction, AppNotification, VerificationSubmissionData, UserNotificationPreferences, TravelNotice, SecuritySettings, SecurityQuestionAnswer, LoginAttempt, DeviceInfo, TransactionStatus, PREDEFINED_SECURITY_QUESTIONS, VerificationSubmissionStatus, Payee, ScheduledPayment, ApexCard } from '../types';
 import * as api from '../services/api';
@@ -43,7 +44,8 @@ import {
     addScheduledPaymentToUser,
     cancelScheduledPaymentForUser,
     updateApexCardInUserList,
-    initiateWireTransfer as initiateWireTransferService
+    initiateWireTransfer as initiateWireTransferService,
+    createInitialUsers // Import the initialization function
 } from '../services/userService';
 
 interface AuthContextType {
@@ -122,6 +124,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const checkLoggedInUser = async () => {
       setIsLoading(true);
       try {
+        await createInitialUsers(); // Initialize DB users if needed before anything else.
         const isLoggedInThisSession = sessionStorage.getItem(SESSION_STORAGE_KEY) === 'true';
         const currentUser = await getCurrentLoggedInUserService();
         

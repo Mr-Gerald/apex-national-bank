@@ -1,4 +1,5 @@
 
+
 import { User, UserProfileData, Account, AccountType, Transaction, TransactionType, LinkedExternalAccount, LinkedCard, SavingsGoal, AppNotification, VerificationSubmissionData, UserNotificationPreferences, TravelNotice, SecuritySettings, SecurityQuestionAnswer, LoginAttempt, DeviceInfo, TransactionStatus, PREDEFINED_SECURITY_QUESTIONS, VerificationSubmissionStatus, Payee, ScheduledPayment, ApexCard } from '../types';
 import * as api from './api';
 import { BANK_NAME } from '../constants';
@@ -162,7 +163,7 @@ const createAdminTemplate = (): User => {
 
 
 // Reworked createInitialUsers to be non-destructive
-const createInitialUsers = async (): Promise<void> => {
+export const createInitialUsers = async (): Promise<void> => {
     let users = await getUsersFromStorage();
     let madeChanges = false;
 
@@ -223,8 +224,8 @@ const createInitialUsers = async (): Promise<void> => {
     }
 };
 
-// Call it on script load to ensure data consistency from the start
-createInitialUsers();
+// Call to initialize users moved to AuthContext to prevent build errors from module-level side-effects.
+// createInitialUsers();
 
 
 export const getAllUsers = async (): Promise<User[]> => {
