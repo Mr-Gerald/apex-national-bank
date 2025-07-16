@@ -1,0 +1,9 @@
+
+{
+  "name": "Apex National Bank",
+  "description": "A modern digital banking application interface for managing accounts, viewing transactions, and making transfers.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "prompt": ""
+}

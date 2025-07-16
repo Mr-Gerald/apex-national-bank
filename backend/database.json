@@ -1,0 +1,84 @@
+{
+  "users": [
+    {
+      "id": "user1751717870882",
+      "username": "Alexis",
+      "hashedPassword": "123456",
+      "fullName": "Alexis",
+      "email": "jeffpeter987@gmail.com",
+      "phoneNumber": "(201) 381-0806",
+      "addressLine1": "",
+      "city": "Techville",
+      "state": "CA",
+      "zipCode": "34746",
+      "createdAt": "2025-07-05T12:17:50.882Z",
+      "accounts": [
+        {
+          "id": "user1751717870882-checking1",
+          "name": "Primary Checking",
+          "type": "Primary Checking",
+          "accountNumber": "894796145280",
+          "balance": 0,
+          "transactions": [
+            {
+              "id": "014vsns92126",
+              "date": "2025-07-05T16:00:00.000Z",
+              "description": "Account Opened",
+              "amount": 0,
+              "type": "Credit",
+              "category": "System",
+              "status": "Completed",
+              "userFriendlyId": "TXN-SYS-YOQKRP",
+              "recipientAccountInfo": "Your Account: Primary Checking"
+            }
+          ]
+        }
+      ],
+      "isIdentityVerified": false,
+      "isAdmin": false,
+      "linkedCards": [],
+      "linkedExternalAccounts": [],
+      "savingsGoals": [],
+      "payees": [],
+      "scheduledPayments": [],
+      "apexCards": [],
+      "notifications": [
+        {
+          "id": "t940l5ajbp",
+          "message": "Welcome to Apex National Bank, Alexis!",
+          "date": "2025-07-05T12:17:50.882Z",
+          "read": false,
+          "type": "general"
+        }
+      ],
+      "notificationPreferences": {
+        "transactions": true,
+        "lowBalance": true,
+        "securityAlerts": true,
+        "promotions": false,
+        "appUpdates": true,
+        "lowBalanceThreshold": 100
+      },
+      "travelNotices": [],
+      "securitySettings": {
+        "is2FAEnabled": false,
+        "hasSecurityQuestionsSet": false,
+        "isBiometricEnabled": false
+      },
+      "securityQuestions": [],
+      "loginHistory": [],
+      "recognizedDevices": []
+    }
+  ],
+  "dbLog": [
+    {
+      "timestamp": "2025-07-05T12:17:50.890Z",
+      "category": "USER_REGISTERED_VIA_API",
+      "data": {
+        "userId": "user1751717870882",
+        "username": "Alexis",
+        "email": "jeffpeter987@gmail.com"
+      }
+    }
+  ]
+}

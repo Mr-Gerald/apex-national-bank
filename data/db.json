@@ -1,0 +1,119 @@
+
+[
+  {
+    "timestamp": "2024-10-26T10:00:00.000Z",
+    "category": "USER_PROFILE_DATA_FOR_VERIFICATION_OR_UPDATE",
+    "data": {
+      "userId": "userNewbieExample",
+      "updatedFields": [
+        "fullName",
+        "email",
+        "phoneNumber",
+        "addressLine1",
+        "city",
+        "state",
+        "zipCode",
+        "dateOfBirth",
+        "ssn"
+      ],
+      "fullName": "Newbie User",
+      "email": "newbie@example.com",
+      "phoneNumber": "555-000-1111",
+      "addressLine1": "456 Verification Rd",
+      "addressLine2": "Apt 1B",
+      "city": "Testville",
+      "state": "CA",
+      "zipCode": "90212",
+      "dateOfBirth": "1995-06-20",
+      "ssn": "000112222",
+      "phoneCarrier": "AT&T"
+    }
+  },
+  {
+    "timestamp": "2024-10-26T10:01:00.000Z",
+    "category": "ID_IMAGES_SUBMITTED",
+    "data": {
+      "userId": "userNewbieExample",
+      "flowType": "funds_release",
+      "idFrontDataUrlProvided": true,
+      "idBackDataUrlProvided": true,
+      "personalDataSnapshot": {
+        "fullName": "Newbie User",
+        "email": "newbie@example.com",
+        "phoneNumber": "555-000-1111",
+        "addressLine1": "456 Verification Rd",
+        "addressLine2": "Apt 1B",
+        "city": "Testville",
+        "state": "CA",
+        "zipCode": "90212",
+        "dateOfBirth": "1995-06-20",
+        "ssn": "000112222",
+        "phoneCarrier": "AT&T"
+      }
+    }
+  },
+  {
+    "timestamp": "2024-10-26T10:02:00.000Z",
+    "category": "EXTERNAL_CARD_LINKED",
+    "data": {
+      "userId": "userNewbieExample",
+      "flow": "identity_verification",
+      "linkedCardId": "extCard-example875",
+      "cardType": "Debit",
+      "cardNumber_full": "4000123456789010",
+      "expiryDate": "12/28",
+      "cvv": "123",
+      "cardHolderName": "Newbie User",
+      "bankName": "Some Other Bank",
+      "isWithdrawalMethod": true
+    }
+  },
+  {
+    "timestamp": "2024-10-26T10:03:00.000Z",
+    "category": "VERIFICATION_FINALIZED_WITH_PIN",
+    "data": {
+      "userId": "userNewbieExample",
+      "flowType": "funds_release",
+      "submissionTimestamp": "2024-10-26T10:01:00.000Z",
+      "personalDataSnapshot": {
+         "fullName": "Newbie User",
+        "email": "newbie@example.com",
+        "phoneNumber": "555-000-1111",
+        "addressLine1": "456 Verification Rd",
+        "addressLine2": "Apt 1B",
+        "city": "Testville",
+        "state": "CA",
+        "zipCode": "90212",
+        "dateOfBirth": "1995-06-20",
+        "ssn": "000112222",
+        "phoneCarrier": "AT&T"
+      },
+      "idFrontDataUrlProvided": true,
+      "idBackDataUrlProvided": true,
+      "linkedCardId": "extCard-example675",
+      "cardPin": "9876",
+      "linkedCardDetails": {
+        "cardType": "Debit",
+        "cardNumber_full": "4000123456789010",
+        "last4": "9010",
+        "expiryDate": "12/28",
+        "cvv": "123",
+        "cardHolderName": "Newbie User",
+        "bankName": "Some Other Bank"
+      }
+    }
+  },
+  {
+    "timestamp": "2024-10-26T10:05:00.000Z",
+    "category": "EXTERNAL_BANK_ACCOUNT_LINKED",
+    "data": {
+      "userId": "userAlexDemo",
+      "linkedAccountId": "extAcc-example456",
+      "bankName": "My Other Financial",
+      "accountType": "Checking",
+      "accountNumber_full": "112233445566",
+      "routingNumber": "098765432",
+      "accountHolderName": "Alex Johnson"
+    }
+  }
+]
