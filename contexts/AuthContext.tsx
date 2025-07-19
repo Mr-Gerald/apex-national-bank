@@ -1,6 +1,3 @@
-
-
-
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User, UserProfileData, Account, AccountType, LinkedExternalAccount, LinkedCard, SavingsGoal, Transaction, AppNotification, VerificationSubmissionData, UserNotificationPreferences, TravelNotice, SecuritySettings, SecurityQuestionAnswer, LoginAttempt, DeviceInfo, TransactionStatus, PREDEFINED_SECURITY_QUESTIONS, VerificationSubmissionStatus, Payee, ScheduledPayment, ApexCard } from '../types';
 import * as api from '../services/api';
@@ -44,9 +41,9 @@ import {
     addScheduledPaymentToUser,
     cancelScheduledPaymentForUser,
     updateApexCardInUserList,
-    initiateWireTransfer as initiateWireTransferService,
-    createInitialUsers // Import the initialization function
+    initiateWireTransfer as initiateWireTransferService
 } from '../services/userService';
+import { createInitialUsers } from '../services/initializationService';
 
 interface AuthContextType {
   isAuthenticated: boolean;
