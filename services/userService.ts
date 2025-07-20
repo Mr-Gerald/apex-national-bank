@@ -358,7 +358,6 @@ const alexInitialSavingsGoalsScoped: SavingsGoal[] = [
   { id: 'alexGoal3', name: 'Emergency Fund Top-up', targetAmount: 15000, currentAmount: 12000 }
 ];
 const alexInitialNotificationsScoped: AppNotification[] = [
-    { id: 'notif1_alex', message: `Welcome to ${BANK_NAME}, Alex! Explore your new account features.`, date: new Date(Date.now() - 86400000 * 2).toISOString(), read: true, type: 'general' },
     { id: 'notif2_alex', message: 'Your recent transfer of $500.00 to Savings Goal "European Backpacking Trip" was successful.', date: new Date(Date.now() - 86400000 * 1).toISOString(), read: false, type: 'transfer_success', linkTo: '/profile/savings-goals'},
 ];
 const alexInitialLinkedAccountsScoped: LinkedExternalAccount[] = [
