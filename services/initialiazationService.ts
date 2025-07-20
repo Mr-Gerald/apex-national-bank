@@ -68,8 +68,8 @@ const createAlexTemplate = (): User => {
     ];
 
     return {
-        id: 'userAlex123', username: 'Alex', hashedPassword: 'ApexBankR0cks!',
-        fullName: 'Alex Johnson', email: 'alex.johnson@example.com', phoneNumber: '555-123-4567',
+        id: 'userAlex123', username: 'MidnightTaco', hashedPassword: 'MidnightTaco#2025',
+        fullName: 'Mac Frosh', email: 'alex.johnson@example.com', phoneNumber: '555-123-4567',
         addressLine1: '123 Innovation Drive', city: 'Techville', state: 'CA', zipCode: '90210',
         dateOfBirth: '1985-07-15', occupation: 'Software Engineer', maritalStatus: 'Single',
         profileImageUrl: `https://i.pravatar.cc/150?u=alex.johnson@example.com`,
