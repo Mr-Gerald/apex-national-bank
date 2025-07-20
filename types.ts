@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 
 export enum AccountType {
@@ -30,6 +29,15 @@ export interface Transaction {
   senderAccountInfo?: string; 
   recipientAccountInfo?: string; 
   memo?: string; 
+  wireDetails?: {
+      type: 'domestic' | 'international';
+      swiftCode?: string;
+      recipientCountry?: string;
+      recipientBankName?: string;
+      recipientBankAddress?: string;
+      recipientAddress?: string;
+      purposeOfWire?: string;
+  }
 }
 
 export interface Account {
@@ -305,37 +313,6 @@ export interface RewardItemType {
   imageUrl?: string;
   icon?: React.ReactNode; 
 }
-
-export interface WireTransferDetails {
-    // Shared
-    transferType: 'domestic' | 'international';
-    amount: number;
-
-    // Recipient Info
-    recipientName: string;
-    recipientAddress: string;
-    recipientCity: string;
-    recipientState: string;
-    recipientZip: string;
-    recipientPhone: string;
-    
-    // Bank Info
-    bankName: string;
-    bankAddress: string;
-    routingNumber: string;
-    accountNumber: string;
-    accountType: 'Checking' | 'Savings';
-
-    // International only
-    swiftCode?: string;
-    iban?: string;
-
-    // Transfer details
-    purposeOfTransfer?: string;
-    paymentInstructions?: string;
-    reference?: string; 
-}
-
 
 export interface WealthManagementService {
     id: string;

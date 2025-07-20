@@ -1,6 +1,7 @@
+
+
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User, UserProfileData, Account, AccountType, LinkedExternalAccount, LinkedCard, SavingsGoal, Transaction, AppNotification, VerificationSubmissionData, UserNotificationPreferences, TravelNotice, SecuritySettings, SecurityQuestionAnswer, LoginAttempt, DeviceInfo, TransactionStatus, PREDEFINED_SECURITY_QUESTIONS, VerificationSubmissionStatus, Payee, ScheduledPayment, ApexCard } from '../types';
-import * as api from '../services/api';
 import {
     loginUser as loginUserService,
     registerUser as registerUserService,
@@ -41,9 +42,13 @@ import {
     addScheduledPaymentToUser,
     cancelScheduledPaymentForUser,
     updateApexCardInUserList,
-    initiateWireTransfer as initiateWireTransferService
+    createInitialUsers,
+    clearCurrentUserId,
+    clearAdminSession,
+    clearIsLoggedInThisSession,
+    getIsLoggedInThisSession,
+    saveIsLoggedInThisSession
 } from '../services/userService';
-import { createInitialUsers } from '../services/initializationService';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -100,12 +105,9 @@ interface AuthContextType {
   addScheduledPayment: (paymentData: Omit<ScheduledPayment, 'id'|'status'>) => Promise<void>;
   cancelScheduledPayment: (paymentId: string) => Promise<void>;
   updateApexCard: (updatedCard: ApexCard) => Promise<void>;
-  initiateWireTransfer: (fromAccountId: string, amount: number, recipientName: string, memo: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const SESSION_STORAGE_KEY = 'apexBankIsLoggedInThisSession';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -121,8 +123,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const checkLoggedInUser = async () => {
       setIsLoading(true);
       try {
-        await createInitialUsers(); // Initialize DB users if needed before anything else.
-        const isLoggedInThisSession = sessionStorage.getItem(SESSION_STORAGE_KEY) === 'true';
+        await createInitialUsers(); // Initialize users in localStorage
+        const isLoggedInThisSession = getIsLoggedInThisSession();
         const currentUser = await getCurrentLoggedInUserService();
         
         if (currentUser && isLoggedInThisSession) {
@@ -134,18 +136,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setUser(null);
             setIsAuthenticated(false);
             setIsAdmin(false);
-            await api.clearCurrentUserId();
-            await api.clearAdminSession();
-            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+            clearCurrentUserId();
+            clearAdminSession();
+            clearIsLoggedInThisSession();
         }
       } catch (error) {
         console.error("Error during initial auth check:", error);
         setUser(null);
         setIsAuthenticated(false);
         setIsAdmin(false);
-        await api.clearCurrentUserId();
-        await api.clearAdminSession();
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        clearCurrentUserId();
+        clearAdminSession();
+        clearIsLoggedInThisSession();
       } finally {
         setIsLoading(false);
       }
@@ -177,7 +179,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsAuthenticated(true);
         const adminStatus = loggedInUser.isAdmin || false;
         setIsAdmin(adminStatus);
-        sessionStorage.setItem(SESSION_STORAGE_KEY, 'true'); // Set session flag
+        saveIsLoggedInThisSession(); // Set session flag
         setIsLoginTransition(false); // Hide loading screen, which triggers navigation
       }, 1500);
 
@@ -210,7 +212,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const executeLogout = async () => {
     await logoutUserService();
-    sessionStorage.removeItem(SESSION_STORAGE_KEY); // Clear session flag
+    clearIsLoggedInThisSession(); // Clear session flag
     setUser(null);
     setIsAuthenticated(false);
     setIsAdmin(false);
@@ -220,7 +222,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const adminLogout = async () => {
     await logoutUserService(); 
-    sessionStorage.removeItem(SESSION_STORAGE_KEY); // Clear session flag
+    clearIsLoggedInThisSession(); // Clear session flag
     setUser(null);
     setIsAuthenticated(false);
     setIsAdmin(false);
@@ -564,17 +566,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(updatedUser);
     };
 
-    const initiateWireTransfer = async (fromAccountId: string, amount: number, recipientName: string, memo: string) => {
-        if (!user) throw new Error("User not authenticated.");
-        try {
-            const updatedUser = await initiateWireTransferService(user.id, fromAccountId, amount, recipientName, memo);
-            setUser(updatedUser);
-        } catch (error: any) {
-            setAuthError(error.message || "Failed to initiate wire transfer.");
-            throw error;
-        }
-    };
-
 
   if (isLoading) {
     return (
@@ -599,8 +590,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAdmin,
         fetchAllUsersForAdmin, updateUserByAdmin, sendNotificationFromAdmin, adminMarkUserVerified,
         // New functions
-        addPayee, updatePayee, deletePayee, addScheduledPayment, cancelScheduledPayment, updateApexCard,
-        initiateWireTransfer
+        addPayee, updatePayee, deletePayee, addScheduledPayment, cancelScheduledPayment, updateApexCard
      }}>
       {children}
     </AuthContext.Provider>

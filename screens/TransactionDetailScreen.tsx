@@ -118,15 +118,27 @@ const TransactionDetailScreen: React.FC = () => {
 
 
   const canVerifyTransaction = 
-    transaction.status === 'On Hold' &&
+    (transaction.status === 'On Hold' || transaction.status === 'Pending') &&
     (
-      transaction.holdReason?.toLowerCase().includes("identity verification required to release these funds") || 
-      transaction.holdReason?.toLowerCase().includes("identity verification was not successful. please click 'verify identity' below to try again.") ||
-      transaction.holdReason?.toLowerCase().includes("verification attempt rejected. please re-verify your identity to release these funds.")
+      transaction.holdReason?.toLowerCase().includes("identity verification required") || 
+      transaction.holdReason?.toLowerCase().includes("identity verification was not successful") ||
+      transaction.holdReason?.toLowerCase().includes("verification attempt rejected")
     ) &&
-    transaction.type === TransactionType.CREDIT &&
     account.id.startsWith(user?.id || "___NO_USER_ID_MATCH___") && 
     !user?.isIdentityVerified; 
+    
+  const isWireHoldForFees = 
+    transaction.status === 'Pending' &&
+    transaction.holdReason?.toLowerCase().includes("account security fees");
+
+  const handleResolveViaEmail = () => {
+      if (!user) return;
+      const supportEmail = "support@apexnationalbank.com";
+      const subject = `Urgent: Verification for Wire Transfer ${transaction.userFriendlyId}`;
+      const body = `Dear Support Team,\n\nI have a pending wire transfer that requires verification for account security fees.\n\nTransaction ID: ${transaction.userFriendlyId}\nAmount: ${formatCurrency(transaction.amount)}\nRecipient: ${transaction.wireDetails?.recipientBankName || transaction.description}\n\nPlease let me know what steps I need to take to resolve this and release the funds.\n\nThank you,\n${user.fullName}`;
+      const mailtoLink = `mailto:${supportEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.location.href = mailtoLink;
+  };
 
 
   return (
@@ -191,6 +203,14 @@ const TransactionDetailScreen: React.FC = () => {
               </Button>
             </Link>
           </div>
+        )}
+
+        {isWireHoldForFees && (
+            <div className="mt-6 hide-on-print">
+                <Button variant="primary" className="w-full" onClick={handleResolveViaEmail} leftIcon={<ShieldCheckIcon className="w-5 h-5"/>}>
+                    Resolve via Email
+                </Button>
+            </div>
         )}
 
         <div className="mt-6 grid grid-cols-2 gap-3 hide-on-print">

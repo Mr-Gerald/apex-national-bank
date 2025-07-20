@@ -1,14 +1,8 @@
 
-
 import { Account, Transaction, AccountType, TransactionType } from '../types';
 
 // Helper to generate a unique ID
 export const generateNewId = (): string => Math.random().toString(36).substring(2, 15);
-
-// Helper to create date strings
-const createDateISO = (year: number, month: number, day: number, hour = 0, minute = 0, second = 0): string => {
-  return new Date(year, month - 1, day, hour, minute, second).toISOString();
-};
 
 export const generateRandomAccountNumber = (length: number = 12): string => {
     let result = '';
@@ -17,33 +11,6 @@ export const generateRandomAccountNumber = (length: number = 12): string => {
     }
     return result;
 };
-
-export const generateInitialAccountsForNewUser = (userIdPrefix: string): Account[] => {
-    const today = new Date();
-    const checkingTransactions: Transaction[] = [
-        { 
-            id: generateNewId(), 
-            date: createDateISO(today.getFullYear(), today.getMonth()+1, today.getDate(), 9, 0, 0), 
-            description: 'Account Opened', 
-            amount: 0, 
-            type: TransactionType.CREDIT, 
-            category: 'System',
-            status: 'Completed',
-            userFriendlyId: `TXN-SYS-${generateNewId().slice(0,6).toUpperCase()}`, // Ensure distinct userFriendlyId
-            recipientAccountInfo: "Your Account: Primary Checking",
-        },
-    ];
-    
-    const initialAccounts: Account[] = [
-        {
-            id: `${userIdPrefix}-checking1`, name: AccountType.CHECKING, type: AccountType.CHECKING,
-            accountNumber: generateRandomAccountNumber(12), balance: 0.00, transactions: checkingTransactions,
-        }
-    ];
-    initialAccounts.forEach(recalculateBalancesForAccount);
-    return initialAccounts;
-};
-
 
 export const recalculateBalancesForAccount = (account: Account): void => {
     if (!account || !account.transactions) return;

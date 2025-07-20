@@ -7,7 +7,7 @@ import {
     recalculateBalancesForAccount as serviceRecalculateBalances,
     addTransactionToUserAccountList as serviceAddTransaction 
 } from '../services/accountService';
-import { performInterUserTransfer } from '../services/userService';
+import { performInterUserTransfer, initiateWireTransfer as serviceInitiateWireTransfer } from '../services/userService';
 
 
 interface AccountContextType {
@@ -17,6 +17,7 @@ interface AccountContextType {
   fetchAccountById: (id: string) => Account | undefined;
   refreshUserAccounts: () => void; 
   initiateTransfer: (fromAccountId: string, toAccountIdOrUsername: string, amount: number, memo: string, recipientUsername?: string) => Promise<string | undefined>;
+  initiateWireTransfer: (fromAccountId: string, amount: number, recipientName: string, recipientRoutingNumber: string, recipientAccountNumber: string, wireType: 'domestic' | 'international', swiftCode: string | undefined, recipientCountry: string | undefined, recipientBankName: string, recipientBankAddress: string, recipientAddress: string, purposeOfWire: string, memo?: string) => Promise<Transaction | undefined>;
 }
 
 const AccountContext = createContext<AccountContextType | undefined>(undefined);
@@ -136,8 +137,34 @@ export const AccountProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const initiateWireTransfer = async (fromAccountId: string, amount: number, recipientName: string, recipientRoutingNumber: string, recipientAccountNumber: string, wireType: 'domestic' | 'international', swiftCode: string | undefined, recipientCountry: string | undefined, recipientBankName: string, recipientBankAddress: string, recipientAddress: string, purposeOfWire: string, memo?: string): Promise<Transaction | undefined> => {
+    if (!user) {
+      throw new Error("User not authenticated for wire transfer.");
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { updatedUser, newTransaction } = await serviceInitiateWireTransfer(
+          user.id, fromAccountId, amount, recipientName, recipientRoutingNumber, recipientAccountNumber, 
+          wireType, swiftCode, recipientCountry, recipientBankName, recipientBankAddress, recipientAddress, purposeOfWire, memo
+      );
+      if (updateUserAccountsInContext) {
+          await updateUserAccountsInContext(updatedUser.accounts);
+      }
+      refreshUserAccounts();
+      return newTransaction;
+    } catch (e: any) {
+      console.error("Wire transfer failed:", e);
+      setError(e.message || "Wire transfer failed. Please try again.");
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   return (
-    <AccountContext.Provider value={{ accounts, loading, error, fetchAccountById, refreshUserAccounts, initiateTransfer }}>
+    <AccountContext.Provider value={{ accounts, loading, error, fetchAccountById, refreshUserAccounts, initiateTransfer, initiateWireTransfer }}>
       {children}
     </AccountContext.Provider>
   );

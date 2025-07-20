@@ -1,8 +1,7 @@
+
 import { User, UserProfileData, Account, AccountType, Transaction, TransactionType, LinkedExternalAccount, LinkedCard, SavingsGoal, AppNotification, VerificationSubmissionData, UserNotificationPreferences, TravelNotice, SecuritySettings, SecurityQuestionAnswer, LoginAttempt, DeviceInfo, TransactionStatus, PREDEFINED_SECURITY_QUESTIONS, VerificationSubmissionStatus, Payee, ScheduledPayment, ApexCard } from '../types';
-import * as api from './api';
 import { BANK_NAME } from '../constants';
 import { 
-    generateInitialAccountsForNewUser,
     recalculateBalancesForAccount,
     generateNewId as generateAccountServiceId, 
     generateRandomAccountNumber,
@@ -10,72 +9,550 @@ import {
 } from './accountService';
 import { formatCurrency, formatDate } from '../utils/formatters'; 
 
-// --- Internal DB Log for data/db.json ---
-let _internalDbLog: any[] = [];
+// --- Functions moved from accountService.ts to resolve module loading issue ---
 
-// Initialize with empty log. In a real scenario, this might load existing db.json.
-export const _initializeInternalDbLog = async (existingLog?: any[]) => {
-    if (existingLog && Array.isArray(existingLog)) {
-        _internalDbLog = [...existingLog];
-    } else {
-         _internalDbLog = await api.fetchDbLog();
+// Helper to create date strings
+const createDateISO = (year: number, month: number, day: number, hour = 0, minute = 0, second = 0): string => {
+  return new Date(year, month - 1, day, hour, minute, second).toISOString();
+};
+
+// Generate detailed historical transactions for a specific target balance and type
+const generateHistoricalTransactionsForSeed = (
+    initialTargetBalance: number,
+    accountType: AccountType,
+    isAlexAccount: boolean = false // Flag to adjust date generation for Alex
+  ): { transactions: Transaction[], finalBalanceBeforeLatestIncome: number, maxHistoricalDate: Date } => {
+  
+  let balance = initialTargetBalance * (0.3 + Math.random() * 0.2); 
+  const transactions: Transaction[] = [];
+  const today = new Date();
+  // For Alex, ensure historical data is older to make the "contract payment" relatively recent but still past
+  const refYear = isAlexAccount ? today.getFullYear() -1 : today.getFullYear(); 
+  let maxHistoricalDate = new Date(refYear - 3, 0, 1); // Start further back for maxHistoricalDate
+
+  let baseSalary = 6500;
+  let businessBaseRevenue = 15000;
+
+  // Generate data for a few years back, ending before "refYear" for Alex if needed
+  const startYear = refYear - (isAlexAccount ? 3 : 2); // e.g., 3 years of history
+
+  for (let year = refYear; year >= startYear; year--) {
+    for (let month = 12; month >= 1; month--) {
+      // Skip future months if generating for the current year (for non-Alex)
+      if (!isAlexAccount && year === today.getFullYear() && month > today.getMonth() + 1) continue;
+      // If it's Alex, and we are in refYear (which is today.getFullYear() -1), generate all months
+      // No special skip needed unless refYear itself is the current year (which it isn't for Alex by design)
+
+      const daysInMonth = new Date(year, month, 0).getDate();
+      
+      if (accountType === AccountType.CHECKING) {
+        if (month % 2 === 0) { 
+         const incomeAmount = Math.floor(baseSalary * (0.9 + Math.random() * 0.2));
+         const incomeDate = createDateISO(year, month, Math.random() > 0.5 ? 5 : 20, Math.floor(Math.random()*6)+9);
+         transactions.push({
+           id: generateAccountServiceId(), date: incomeDate, description: 'Direct Deposit - Employer',
+           amount: incomeAmount, type: TransactionType.CREDIT, category: 'Income', status: 'Completed',
+           userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+         });
+         balance += incomeAmount;
+         if (new Date(incomeDate) > maxHistoricalDate) maxHistoricalDate = new Date(incomeDate);
+        }
+        if (year > startYear && month % 5 === 0 && Math.random() > 0.6) { 
+            const bonusAmount = Math.floor(Math.random() * 15000) + 5000;
+            const bonusDate = createDateISO(year, month, Math.floor(Math.random() * 10) + 10, Math.floor(Math.random()*6)+9);
+            transactions.push({
+              id: generateAccountServiceId(), date: bonusDate, description: 'Annual Performance Bonus',
+              amount: bonusAmount, type: TransactionType.CREDIT, category: 'Bonus', status: 'Completed',
+              userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+            });
+            balance += bonusAmount;
+            if (new Date(bonusDate) > maxHistoricalDate) maxHistoricalDate = new Date(bonusDate);
+        }
+      } else if (accountType === AccountType.BUSINESS_CHECKING) {
+        const numClientPayments = Math.floor(Math.random() * 3) + 2;
+        for(let k=0; k<numClientPayments; k++) {
+            const incomeAmount = Math.floor(businessBaseRevenue * (0.3 + Math.random() * 1.5));
+            const paymentDate = createDateISO(year, month, Math.floor(Math.random() * 20) + 5, Math.floor(Math.random()*6)+9);
+            transactions.push({
+            id: generateAccountServiceId(), date: paymentDate, description: `Client Payment - ${['Alpha Corp', 'Beta LLC', 'Gamma Solutions'][k%3]}`,
+            amount: incomeAmount, type: TransactionType.CREDIT, category: 'Revenue', status: 'Completed',
+            userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+            });
+            balance += incomeAmount;
+            if (new Date(paymentDate) > maxHistoricalDate) maxHistoricalDate = new Date(paymentDate);
+        }
+        if (year > startYear && month % 7 === 0 && Math.random() > 0.5) { 
+            const contractAmount = Math.floor(Math.random() * 150000) + 50000;
+            const contractDate = createDateISO(year, month, Math.floor(Math.random() * 15) + 5, Math.floor(Math.random()*6)+9);
+            transactions.push({
+              id: generateAccountServiceId(), date: contractDate, description: 'Major Contract Payout - Project Phoenix',
+              amount: contractAmount, type: TransactionType.CREDIT, category: 'Contract Revenue', status: 'Completed',
+              userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+            });
+            balance += contractAmount;
+            if (new Date(contractDate) > maxHistoricalDate) maxHistoricalDate = new Date(contractDate);
+        }
+      } else if (accountType === AccountType.SAVINGS) {
+        const interestAmount = Math.floor(balance * (0.0012 + Math.random() * 0.0020)); 
+        if (interestAmount > 1) {
+            const interestDate = createDateISO(year, month, 28, Math.floor(Math.random()*6)+9);
+            transactions.push({
+            id: generateAccountServiceId(), date: interestDate, description: 'Interest Earned',
+            amount: interestAmount, type: TransactionType.CREDIT, category: 'Interest', status: 'Completed',
+            userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+            });
+            balance += interestAmount;
+            if (new Date(interestDate) > maxHistoricalDate) maxHistoricalDate = new Date(interestDate);
+        }
+         if (year > startYear && month % 8 === 0 && Math.random() > 0.6) { 
+            const largeDeposit = Math.floor(Math.random() * 75000) + 25000;
+            const depositDate = createDateISO(year, month, Math.floor(Math.random() * 10) + 1, Math.floor(Math.random()*6)+9);
+            transactions.push({
+              id: generateAccountServiceId(), date: depositDate, description: 'Investment Portfolio Dividend',
+              amount: largeDeposit, type: TransactionType.CREDIT, category: 'Investment', status: 'Completed',
+              userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+            });
+            balance += largeDeposit;
+            if (new Date(depositDate) > maxHistoricalDate) maxHistoricalDate = new Date(depositDate);
+        }
+      } else if (accountType === AccountType.IRA) {
+        if (month === 1 || (month === 7 && year > startYear)) { 
+            const contributionAmount = Math.floor(Math.random() * (10000 - 4000 +1)) + 4000;
+            const contributionDate = createDateISO(year, month, Math.floor(Math.random() * 10) + 5, Math.floor(Math.random()*6)+9);
+             transactions.push({
+                id: generateAccountServiceId(), date: contributionDate, description: 'IRA Contribution',
+                amount: contributionAmount, type: TransactionType.CREDIT, category: 'Contribution', status: 'Completed',
+                userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+            });
+            balance += contributionAmount;
+            if (new Date(contributionDate) > maxHistoricalDate) maxHistoricalDate = new Date(contributionDate);
+        }
+        const marketFluctuation = balance * ( (Math.random() - 0.40) * 0.15 ); 
+        if (Math.abs(marketFluctuation) > 100) {
+             const marketDate = createDateISO(year, month, Math.floor(Math.random() * 5) + 20, Math.floor(Math.random()*6)+10);
+             transactions.push({
+                id: generateAccountServiceId(), date: marketDate, description: marketFluctuation > 0 ? 'Market Gains Investment' : 'Market Fluctuation Loss',
+                amount: Math.abs(marketFluctuation), type: marketFluctuation > 0 ? TransactionType.CREDIT : TransactionType.DEBIT, category: 'Investment', status: 'Completed',
+                userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+            });
+            balance += marketFluctuation;
+            if (new Date(marketDate) > maxHistoricalDate) maxHistoricalDate = new Date(marketDate);
+        }
+      }
+
+      const numExpenses = Math.floor(Math.random() * (accountType === AccountType.CHECKING ? 10 : (accountType === AccountType.BUSINESS_CHECKING ? 7 : 3))) + (accountType === AccountType.CHECKING ? 7 : (accountType === AccountType.BUSINESS_CHECKING ? 4 : 1));
+      const humanCategories = ['Coffee Shop', 'Online Subscription', 'Book Store', 'Dinner with Friends', 'Weekend Getaway', 'Concert Tickets', 'Charity Donation', 'Gym Membership', 'Electronics Store'];
+      const businessCategories = ['Software Subscription', 'Office Supplies', 'Client Lunch & Entertainment', 'Travel Expense', 'Consulting Fees', 'Marketing Campaign', 'Cloud Services Bill'];
+      
+      let expenseCategories = ['Groceries', 'Utilities', 'Rent/Mortgage', 'Dining Out', 'Shopping', 'Transport', 'Entertainment', 'Healthcare', ...humanCategories];
+      if (accountType === AccountType.BUSINESS_CHECKING) {
+        expenseCategories = ['Operating Costs', 'Digital Advertising', 'Payroll Processing Fee', ...businessCategories];
+      }
+      if (accountType === AccountType.SAVINGS || accountType === AccountType.IRA) {
+        expenseCategories = ['Withdrawal', 'Account Maintenance Fee']; 
+      }
+
+      for (let i = 0; i < numExpenses; i++) {
+        const day = Math.floor(Math.random() * daysInMonth) + 1;
+        const category = expenseCategories[Math.floor(Math.random() * expenseCategories.length)];
+        let amount = Math.floor(Math.random() * (accountType === AccountType.CHECKING ? 350 : (accountType === AccountType.BUSINESS_CHECKING ? 1500 : 150))) + 20;
+        
+        if (category === 'Rent/Mortgage' && accountType === AccountType.CHECKING) amount = Math.floor(Math.random() * 1200) + 1800;
+        if ((category === 'Payroll Processing Fee' || category === 'Operating Costs') && accountType === AccountType.BUSINESS_CHECKING) amount = Math.floor(Math.random() * 4000) + 6000;
+        if (category === 'Withdrawal' && (accountType === AccountType.SAVINGS || accountType === AccountType.IRA)) {
+             if (year > refYear -1 || Math.random() > 0.05) continue; // Make withdrawals rarer for savings/IRA and older
+            amount = Math.floor(Math.random() * 2000) + 500;
+        }
+
+        if (balance - amount < 200 && year < refYear -1 ) { 
+            amount = Math.max(0, balance - 200 - (Math.random()*100));
+        }
+        if (amount <= 10) continue; 
+
+        const expenseDate = createDateISO(year, month, day, Math.floor(Math.random()*12)+8, Math.floor(Math.random()*60));
+        transactions.push({
+          id: generateAccountServiceId(), date: expenseDate, 
+          description: category === 'Online Subscription' ? `Subscription - ${['Zenith Streaming', 'Apex Pro Tools', 'NewsNow'][Math.floor(Math.random()*3)]}` : `${category}`,
+          amount: amount, type: TransactionType.DEBIT, category: category, status: 'Completed',
+          userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+        });
+        balance -= amount;
+        if (new Date(expenseDate) > maxHistoricalDate) maxHistoricalDate = new Date(expenseDate);
+      }
     }
+  }
+  
+  const diffFromTarget = initialTargetBalance - balance;
+  if (Math.abs(diffFromTarget) > initialTargetBalance * 0.1 && transactions.length > 5) { 
+      // Make adjustment on a date relative to maxHistoricalDate but ensure it's reasonable
+      const adjustmentBaseDate = maxHistoricalDate > new Date(2000,0,1) ? maxHistoricalDate : new Date(refYear, 0, 15);
+      const adjustmentDate = new Date(adjustmentBaseDate);
+      adjustmentDate.setDate(adjustmentDate.getDate() - (Math.floor(Math.random()*30)+15) ); // 15-45 days before maxHistoricalDate
+
+      transactions.push({
+          id: generateAccountServiceId(), date: adjustmentDate.toISOString(),
+          description: `Historical Balance Adjustment (${accountType})`,
+          amount: Math.abs(diffFromTarget), 
+          type: diffFromTarget > 0 ? TransactionType.CREDIT : TransactionType.DEBIT, 
+          category: "Adjustment", status: 'Completed',
+          userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+      });
+      balance += diffFromTarget;
+      // No need to update maxHistoricalDate here as this adjustment is older
+  }
+
+  transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return { transactions, finalBalanceBeforeLatestIncome: balance, maxHistoricalDate };
 };
-_initializeInternalDbLog();
 
+const generateInitialAlexAccounts = (): Account[] => {
+    let primaryCheckingTargetBeforeContract = 281234.56; 
+    // Generate Alex's historical data ensuring it's older
+    let primaryCheckingHistoricalData = generateHistoricalTransactionsForSeed(primaryCheckingTargetBeforeContract, AccountType.CHECKING, true);
+    let businessCheckingData = generateHistoricalTransactionsForSeed(1075827.10, AccountType.BUSINESS_CHECKING, true);
+    let savingsData = generateHistoricalTransactionsForSeed(1550567.12, AccountType.SAVINGS, true);
+    let iraData = generateHistoricalTransactionsForSeed(1000110.05, AccountType.IRA, true);
 
-const _logSensitiveData = async (category: string, data: object) => {
-    const logEntry = {
-        timestamp: new Date().toISOString(),
-        category,
-        data
+    // Set the major contract payment to be a few days in the past from today
+    const contractPaymentDate = new Date();
+    contractPaymentDate.setDate(contractPaymentDate.getDate() - 3); // 3 days ago
+    contractPaymentDate.setHours(15, 30, 0, 0);
+
+    const contractPaymentAmount = 220000;
+    const contractPayment: Transaction = {
+      id: 'contract-payment-alex-latest',
+      date: contractPaymentDate.toISOString(),
+      description: 'Contract Payment - Project Apex Titan',
+      amount: contractPaymentAmount,
+      type: TransactionType.CREDIT,
+      category: 'Income',
+      status: 'Completed',
+      userFriendlyId: `TXN-${generateAccountServiceId().slice(0,8).toUpperCase()}`,
+      senderAccountInfo: "External Payer",
+      recipientAccountInfo: "Your Account: Primary Checking"
     };
-    _internalDbLog.push(logEntry);
-    // For debugging in browser console:
-    console.log("Logged via API:", JSON.stringify(logEntry, null, 2));
+    
+    let finalPrimaryCheckingTransactions = [contractPayment, ...primaryCheckingHistoricalData.transactions];
+    
+    let alexAccounts: Account[] = [
+      {
+        id: 'alexPrimaryChecking', name: AccountType.CHECKING, type: AccountType.CHECKING,
+        accountNumber: generateRandomAccountNumber(12), balance: 0,
+        transactions: finalPrimaryCheckingTransactions,
+      },
+      {
+        id: 'alexBusinessChecking', name: AccountType.BUSINESS_CHECKING, type: AccountType.BUSINESS_CHECKING,
+        accountNumber: generateRandomAccountNumber(10), balance: 0, 
+        transactions: businessCheckingData.transactions,
+      },
+      {
+        id: 'alexSavings', name: AccountType.SAVINGS, type: AccountType.SAVINGS,
+        accountNumber: generateRandomAccountNumber(12), balance: 0,
+        transactions: savingsData.transactions,
+      },
+      {
+        id: 'alexIRA', name: AccountType.IRA, type: AccountType.IRA,
+        accountNumber: generateRandomAccountNumber(10), balance: 0,
+        transactions: iraData.transactions,
+      },
+    ];
+    
+    alexAccounts.forEach(recalculateBalancesForAccount); 
 
-    await api.saveDbLog(_internalDbLog);
+    const targetTotalAlex = 4127738.83;
+    let currentTotalAlex = alexAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+    let differenceAlex = targetTotalAlex - currentTotalAlex;
+
+    if (Math.abs(differenceAlex) > 0.01 && alexAccounts.length > 0) {
+        const savingsAccount = alexAccounts.find(acc => acc.type === AccountType.SAVINGS);
+        const targetAdjustmentAccount = savingsAccount || alexAccounts.sort((a,b) => b.balance - a.balance)[0];
+        
+        if (targetAdjustmentAccount) {
+            if (Math.abs(differenceAlex) > 0.01) { 
+                // Make adjustment date slightly after contract payment for logical flow if needed
+                const adjDate = new Date(contractPaymentDate.getTime() + (60*60*1000)); 
+                const adjTransaction: Transaction = {
+                    id: generateAccountServiceId(), date: adjDate.toISOString(),
+                    description: differenceAlex > 0 ? 'Year-End Interest/Dividend Adjustment' : 'Year-End Fee/Tax Adjustment',
+                    amount: Math.abs(differenceAlex), 
+                    type: differenceAlex > 0 ? TransactionType.CREDIT : TransactionType.DEBIT,
+                    category: 'Adjustment',
+                    status: 'Completed',
+                    userFriendlyId: `TXN-${generateAccountServiceId().slice(0,6).toUpperCase()}`,
+                };
+                targetAdjustmentAccount.transactions.unshift(adjTransaction); 
+            }
+        }
+    }
+    
+    alexAccounts.forEach(recalculateBalancesForAccount); 
+    return alexAccounts;
 };
+
+const generateInitialAccountsForNewUser = (userIdPrefix: string): Account[] => {
+    const today = new Date();
+    const checkingTransactions: Transaction[] = [
+        { 
+            id: generateAccountServiceId(), 
+            date: createDateISO(today.getFullYear(), today.getMonth()+1, today.getDate(), 9, 0, 0), 
+            description: 'Account Opened', 
+            amount: 0, 
+            type: TransactionType.CREDIT, 
+            category: 'System',
+            status: 'Completed',
+            userFriendlyId: `TXN-SYS-${generateAccountServiceId().slice(0,6).toUpperCase()}`, // Ensure distinct userFriendlyId
+            recipientAccountInfo: "Your Account: Primary Checking",
+        },
+    ];
+    
+    const initialAccounts: Account[] = [
+        {
+            id: `${userIdPrefix}-checking1`, name: AccountType.CHECKING, type: AccountType.CHECKING,
+            accountNumber: generateRandomAccountNumber(12), balance: 0.00, transactions: checkingTransactions,
+        }
+    ];
+    initialAccounts.forEach(recalculateBalancesForAccount);
+    return initialAccounts;
+};
+
+// --- Storage Service Logic (LocalStorage) ---
+
+const USERS_STORAGE_KEY = 'apexBankUsers';
+const CURRENT_USER_ID_KEY = 'apexBankCurrentUserId';
+const ADMIN_SESSION_KEY = 'isAdmin';
+const SESSION_LOGGED_IN_KEY = 'apexBankIsLoggedInThisSession';
+
+
+// --- User Data ---
+const getUsersFromStorage = (): User[] => {
+    const usersJson = localStorage.getItem(USERS_STORAGE_KEY);
+    return usersJson ? JSON.parse(usersJson) : [];
+};
+
+const saveUsersToStorage = (users: User[]): void => {
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+};
+
+// --- Current User Session ---
+export const getCurrentUserId = (): string | null => localStorage.getItem(CURRENT_USER_ID_KEY);
+export const saveCurrentUserId = (userId: string): void => localStorage.setItem(CURRENT_USER_ID_KEY, userId);
+export const clearCurrentUserId = (): void => localStorage.removeItem(CURRENT_USER_ID_KEY);
+
+// --- Admin Session ---
+export const getAdminSession = (): boolean => sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true';
+export const saveAdminSession = (): void => sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
+export const clearAdminSession = (): void => sessionStorage.removeItem(ADMIN_SESSION_KEY);
+
+// --- General Session Flag ---
+export const getIsLoggedInThisSession = (): boolean => sessionStorage.getItem(SESSION_LOGGED_IN_KEY) === 'true';
+export const saveIsLoggedInThisSession = (): void => sessionStorage.setItem(SESSION_LOGGED_IN_KEY, 'true');
+export const clearIsLoggedInThisSession = (): void => sessionStorage.removeItem(SESSION_LOGGED_IN_KEY);
+
 
 // --- User Data Management ---
 
-const getUsersFromStorage = async (): Promise<User[]> => {
-    return await api.fetchAllUsers();
+// Define these at a scope accessible by createAlexTemplate
+const alexInitialSavingsGoalsScoped: SavingsGoal[] = [
+  { id: 'alexGoal1', name: 'European Backpacking Trip', targetAmount: 7500, currentAmount: 2300, deadline: new Date(new Date().getFullYear() + 1, 8, 15).toISOString() },
+  { id: 'alexGoal2', name: 'New Laptop Fund', targetAmount: 2000, currentAmount: 1850, deadline: new Date(new Date().getFullYear(), 11, 20).toISOString() },
+  { id: 'alexGoal3', name: 'Emergency Fund Top-up', targetAmount: 15000, currentAmount: 12000 }
+];
+const alexInitialNotificationsScoped: AppNotification[] = [
+    { id: 'notif1_alex', message: `Welcome to ${BANK_NAME}, Alex! Explore your new account features.`, date: new Date(Date.now() - 86400000 * 2).toISOString(), read: true, type: 'general' },
+    { id: 'notif2_alex', message: 'Your recent transfer of $500.00 to Savings Goal "European Backpacking Trip" was successful.', date: new Date(Date.now() - 86400000 * 1).toISOString(), read: false, type: 'transfer_success', linkTo: '/profile/savings-goals'},
+];
+const alexInitialLinkedAccountsScoped: LinkedExternalAccount[] = [
+    { id: 'chase1001', bankName: 'Chase', accountType: 'Checking', last4: '1001', accountNumber_full: "987654321001", accountHolderName: 'Alex Johnson', isVerified: true },
+    { id: 'boa2002', bankName: 'Bank of America', accountType: 'Savings', last4: '2002', accountNumber_full: "123450987002", accountHolderName: 'Alex Johnson', isVerified: true },
+];
+const alexInitialLinkedCardsScoped: LinkedCard[] = [
+    { id: 'visaGold2002', cardType: 'Visa', last4: '2002', cardNumber_full: "4111222233332002", expiryDate: '12/26', cardHolderName: 'Alex Johnson', isDefault: true, bankName: 'External Bank XYZ', cvv: "123" },
+    { id: 'mcPlatinum3003', cardType: 'Mastercard', last4: '3003', cardNumber_full: "5454666677773003", expiryDate: '10/25', cardHolderName: 'Alex Johnson', isDefault: false, bankName: 'Another Credit Union', cvv: "456" },
+];
+const alexInitialPayeesScoped: Payee[] = [
+    { id: 'payee1_alex', name: 'City Electric Co.', accountNumber: '100200300', zipCode: '90210', category: 'Utilities' },
+    { id: 'payee2_alex', name: 'Apex Mortgage', accountNumber: '9988776655', zipCode: '90211', category: 'Mortgage' },
+    { id: 'payee3_alex', name: 'Gigabit Internet', accountNumber: 'GI-7654321', zipCode: '90210', category: 'Utilities' },
+];
+const alexInitialScheduledPaymentsScoped: ScheduledPayment[] = [
+    { id: 'sp1_alex', payeeId: 'payee1_alex', payeeName: 'City Electric Co.', amount: 75.50, paymentDate: new Date(new Date().setDate(new Date().getDate() + 5)).toISOString(), frequency: 'Monthly', status: 'Scheduled' },
+    { id: 'sp2_alex', payeeId: 'payee2_alex', payeeName: 'Apex Mortgage', amount: 1250.00, paymentDate: new Date(new Date().setDate(new Date().getDate() + 10)).toISOString(), frequency: 'Monthly', status: 'Scheduled' },
+];
+const alexInitialApexCardsScoped: ApexCard[] = [
+    { id: 'apexDebit1234', cardType: 'Debit', cardName: 'Primary Checking Debit', last4: '1234', expiryDate: '11/27', isLocked: false, linkedAccountId: 'alexPrimaryChecking' },
+    { id: 'apexCredit5678', cardType: 'Credit', cardName: 'Apex Rewards Visa', last4: '5678', expiryDate: '08/28', isLocked: true, creditLimit: 10000, availableCredit: 7500.50 },
+];
+
+const defaultNotificationPreferencesScoped: UserNotificationPreferences = {
+    transactions: true,
+    lowBalance: true,
+    securityAlerts: true,
+    promotions: false,
+    appUpdates: true,
+    lowBalanceThreshold: 100,
+};
+const defaultSecuritySettingsScoped: SecuritySettings = {
+    is2FAEnabled: false,
+    twoFAMethod: undefined,
+    hasSecurityQuestionsSet: false,
+    isBiometricEnabled: false,
 };
 
-const saveUsersToStorage = async (users: User[]): Promise<void> => {
-    await api.saveAllUsers(users);
+// Function to create a fresh Alex user object
+const createAlexTemplate = (): User => {
+    const alexAccounts = generateInitialAlexAccounts();
+    const alexLoginHistory: LoginAttempt[] = [
+        {id: generateAccountServiceId(), timestamp: new Date(Date.now() - 86400000*2).toISOString(), ipAddress: "73.12.34.56", status: "Success", deviceInfo: "Chrome on macOS"},
+        {id: generateAccountServiceId(), timestamp: new Date(Date.now() - 86400000).toISOString(), ipAddress: "102.98.76.54", status: "Success", deviceInfo: "Safari on iPhone"},
+    ];
+    const alexRecognizedDevices: DeviceInfo[] = [
+        {id: generateAccountServiceId(), name: "Alex's MacBook Pro", lastLogin: new Date(Date.now() - 86400000*2).toISOString(), ipAddress: "73.12.34.56", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36"},
+    ];
+
+    return {
+        id: 'userAlex123', username: 'Alex', hashedPassword: 'ApexBankR0cks!',
+        fullName: 'Alex Johnson', email: 'alex.johnson@example.com', phoneNumber: '555-123-4567',
+        addressLine1: '123 Innovation Drive', city: 'Techville', state: 'CA', zipCode: '90210',
+        dateOfBirth: '1985-07-15', occupation: 'Software Engineer', maritalStatus: 'Single',
+        profileImageUrl: `https://i.pravatar.cc/150?u=alex.johnson@example.com`,
+        ssn: "000000001", phoneCarrier: "Verizon",
+        createdAt: new Date('2019-01-10T10:00:00Z').toISOString(),
+        accounts: alexAccounts,
+        linkedExternalAccounts: alexInitialLinkedAccountsScoped,
+        linkedCards: alexInitialLinkedCardsScoped,
+        savingsGoals: alexInitialSavingsGoalsScoped,
+        payees: alexInitialPayeesScoped,
+        scheduledPayments: alexInitialScheduledPaymentsScoped,
+        apexCards: alexInitialApexCardsScoped,
+        isIdentityVerified: true,
+        verificationSubmission: {
+            personalDataSnapshot: { fullName: 'Alex Johnson', email: 'alex.johnson@example.com', phoneNumber: '555-123-4567', addressLine1: '123 Innovation Drive', city: 'Techville', state: 'CA', zipCode: '90210', dateOfBirth: '1985-07-15', ssn: "000000001", phoneCarrier: "Verizon" },
+            idFrontDataUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=',
+            idBackDataUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=',
+            linkedWithdrawalCardId: alexInitialLinkedCardsScoped[0]?.id || 'defaultCardIdFallback',
+            cardPin: "1234", 
+            pinVerifiedTimestamp: new Date().toISOString(),
+            submissionTimestamp: new Date().toISOString(),
+            status: 'approved'
+        },
+        notifications: alexInitialNotificationsScoped,
+        notificationPreferences: {...defaultNotificationPreferencesScoped, promotions: true},
+        travelNotices: [{id: 'travel1_alex', destinations: "Paris, France", startDate: new Date(Date.now() + 86400000 * 10).toISOString() , endDate: new Date(Date.now() + 86400000 * 20).toISOString(), accountIds: [alexAccounts[0].id, alexAccounts[1].id]}],
+        lastPasswordChange: new Date(Date.now() - 86400000 * 30).toISOString(),
+        securitySettings: {...defaultSecuritySettingsScoped, is2FAEnabled: true, twoFAMethod: 'app', hasSecurityQuestionsSet: true, isBiometricEnabled: true},
+        securityQuestions: [{questionId: PREDEFINED_SECURITY_QUESTIONS[0].id, answerHash: "Johnson"}, {questionId: PREDEFINED_SECURITY_QUESTIONS[1].id, answerHash: "Buddy"}],
+        loginHistory: alexLoginHistory,
+        recognizedDevices: alexRecognizedDevices,
+        isAdmin: false,
+    };
+};
+
+// Function to create a fresh Admin user object
+const createAdminTemplate = (): User => {
+    return {
+        id: 'adminUser999', username: 'Admin', hashedPassword: 'AdminApexR0cks!',
+        fullName: 'Apex Admin', email: 'admin@apexnationalbank.com', phoneNumber: 'N/A',
+        addressLine1: 'N/A', city: 'N/A', state: 'N/A', zipCode: 'N/A',
+        createdAt: new Date().toISOString(),
+        accounts: [], linkedExternalAccounts: [], linkedCards: [], savingsGoals: [], notifications: [],
+        payees: [], scheduledPayments: [], apexCards: [],
+        notificationPreferences: defaultNotificationPreferencesScoped, travelNotices: [],
+        securitySettings: defaultSecuritySettingsScoped, loginHistory: [], recognizedDevices: [],
+        isAdmin: true,
+    };
+};
+
+
+// Reworked createInitialUsers to be non-destructive
+export const createInitialUsers = async (): Promise<void> => {
+    let users = getUsersFromStorage();
+    let madeChanges = false;
+
+    // Check for Alex
+    const alexExists = users.some(u => u.id === 'userAlex123');
+    if (!alexExists) {
+        console.log("Alex user not found, creating from template.");
+        const freshAlex = createAlexTemplate();
+        users.push(freshAlex);
+        madeChanges = true;
+    }
+
+    // Check for Admin
+    const adminExists = users.some(u => u.id === 'adminUser999');
+    if (!adminExists) {
+        console.log("Admin user not found, creating from template.");
+        const freshAdmin = createAdminTemplate();
+        users.push(freshAdmin);
+        madeChanges = true;
+    }
+    
+    // Ensure all other users (not Alex or Admin) have default empty arrays for new properties
+    users = users.map(user => {
+        if (user.id !== 'userAlex123' && user.id !== 'adminUser999') {
+            let userChanged = false;
+            const defaults = {
+                notificationPreferences: defaultNotificationPreferencesScoped,
+                securitySettings: defaultSecuritySettingsScoped,
+                accounts: [],
+                linkedExternalAccounts: [],
+                linkedCards: [],
+                savingsGoals: [],
+                notifications: [],
+                travelNotices: [],
+                loginHistory: [],
+                recognizedDevices: [],
+                payees: [],
+                scheduledPayments: [],
+                apexCards: [],
+            };
+
+            for (const key in defaults) {
+                if (!user.hasOwnProperty(key) || (user as any)[key] === undefined) {
+                    (user as any)[key] = defaults[key as keyof typeof defaults];
+                    userChanged = true;
+                }
+            }
+
+            if(userChanged) {
+                madeChanges = true;
+            }
+        }
+        return user;
+    });
+
+    if (madeChanges) {
+        saveUsersToStorage(users);
+    }
 };
 
 
 export const getAllUsers = async (): Promise<User[]> => {
-    const users = await getUsersFromStorage();
+    const users = getUsersFromStorage();
     return users.filter(u => !u.isAdmin); // Exclude admin from general user list
 };
 
 export const getUserById = async (userId: string): Promise<User | undefined> => {
-    const users = await getUsersFromStorage();
+    const users = getUsersFromStorage();
     return users.find(u => u.id === userId);
 };
 
 export const updateUserById = async (userId: string, updatedData: Partial<User>): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found for update by ID.");
 
     users[userIndex] = { ...users[userIndex], ...updatedData };
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return users[userIndex];
 };
 
 
 // --- Authentication ---
 export const loginUser = async (username_input: string, password_input: string, ipAddress: string, deviceAgent: string): Promise<User> => {
-    const users = await getUsersFromStorage();
+    const users = getUsersFromStorage();
     const user = users.find(u => u.username.toLowerCase() === username_input.toLowerCase());
 
     if (!user) {
-        await _logSensitiveData("LOGIN_ATTEMPT_FAIL_USER_NOT_FOUND", { username: username_input, ipAddress, deviceAgent, reason: "User not found" });
         throw new Error("User not found.");
     }
 
@@ -85,9 +562,8 @@ export const loginUser = async (username_input: string, password_input: string, 
                 id: generateAccountServiceId(), timestamp: new Date().toISOString(), ipAddress, status: "Failed - Incorrect Password", deviceInfo: deviceAgent,
             };
             user.loginHistory = [failedLoginAttempt, ...(user.loginHistory || [])].slice(0,20);
-            await saveUsersToStorage(users);
+            saveUsersToStorage(users);
         }
-        await _logSensitiveData("LOGIN_ATTEMPT_FAIL_PASSWORD", { username: username_input, ipAddress, deviceAgent, reason: "Incorrect password" });
         throw new Error("Invalid username or password.");
     }
     
@@ -107,11 +583,10 @@ export const loginUser = async (username_input: string, password_input: string, 
             };
             user.recognizedDevices = [newDevice, ...(user.recognizedDevices || [])].slice(0,5);
         }
-        await saveUsersToStorage(users);
+        saveUsersToStorage(users);
     }
 
-    await _logSensitiveData("LOGIN_SUCCESS", { userId: user.id, username: user.username, ipAddress, deviceAgent });
-    await api.saveCurrentUserId(user.id);
+    saveCurrentUserId(user.id);
     return { ...user };
 };
 
@@ -122,7 +597,7 @@ export const registerUser = async (
     ipAddress: string, 
     deviceAgent: string
 ): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     if (users.find(u => u.username.toLowerCase() === username_input.toLowerCase())) {
         throw new Error("Username already exists.");
     }
@@ -160,54 +635,46 @@ export const registerUser = async (
             read: false,
             type: 'general'
         }],
-        notificationPreferences: {
-            transactions: true, lowBalance: true, securityAlerts: true, promotions: false,
-            appUpdates: true, lowBalanceThreshold: 100,
-        },
+        notificationPreferences: { ...defaultNotificationPreferencesScoped },
         travelNotices: [],
         lastPasswordChange: undefined,
-        securitySettings: {
-            is2FAEnabled: false, twoFAMethod: undefined, hasSecurityQuestionsSet: false, isBiometricEnabled: false
-        },
+        securitySettings: { ...defaultSecuritySettingsScoped },
         securityQuestions: [],
         loginHistory: [{id: generateAccountServiceId(), timestamp: new Date().toISOString(), ipAddress, status: "Success", deviceInfo: deviceAgent}],
         recognizedDevices: [{id: generateAccountServiceId(), name: `Device (${deviceAgent.substring(0,20)}...)`, lastLogin: new Date().toISOString(), ipAddress, userAgent: deviceAgent}],
         isAdmin: false,
     };
     users.push(newUser);
-    await saveUsersToStorage(users);
-    await _logSensitiveData("USER_REGISTERED", { userId: newUser.id, username: newUser.username, email: newUser.email });
+    saveUsersToStorage(users);
     return { ...newUser };
 };
 
 export const logoutUser = async (): Promise<void> => {
-    await api.clearCurrentUserId();
-    await api.clearAdminSession();
-    await _logSensitiveData("USER_LOGOUT", { message: "User logged out" });
+    clearCurrentUserId();
+    clearAdminSession();
 };
 
 export const getCurrentLoggedInUser = async (): Promise<User | null> => {
-    const userId = await api.fetchCurrentUserId();
+    const userId = getCurrentUserId();
     if (!userId) return null;
-    const users = await getUsersFromStorage();
+    const users = getUsersFromStorage();
     const user = users.find(u => u.id === userId);
     return user ? { ...user } : null; 
 };
 
 // --- User Profile & Account Management ---
 export const updateUserProfileData = async (userId: string, updatedProfileData: Partial<UserProfileData>): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex] = { ...users[userIndex], ...updatedProfileData };
-    await _logSensitiveData("USER_PROFILE_DATA_FOR_VERIFICATION_OR_UPDATE", { userId, updatedFields: Object.keys(updatedProfileData), ...updatedProfileData});
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const addApexAccountToUser = async (userId: string, newAccountData: Pick<Account, 'name' | 'type'> & { initialBalance?: number }): Promise<Account> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
@@ -250,13 +717,12 @@ export const addApexAccountToUser = async (userId: string, newAccountData: Pick<
 
     user.accounts.push(newApexAccount);
     users[userIndex] = user;
-    await saveUsersToStorage(users);
-    await _logSensitiveData("APEX_ACCOUNT_ADDED", { userId, accountType: newAccountData.type, accountName: newAccountData.name });
+    saveUsersToStorage(users);
     return newApexAccount;
 };
 
 export const updateUserAccountData = async (userId: string, updatedAccounts: Account[]): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
     
@@ -264,13 +730,13 @@ export const updateUserAccountData = async (userId: string, updatedAccounts: Acc
         recalculateBalancesForAccount(acc); 
         return acc;
     });
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 
 export const linkExternalBankAccountToUser = async (userId: string, accountData: Omit<LinkedExternalAccount, 'id' | 'isVerified'> & { routingNumber?: string }): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
     
@@ -280,24 +746,22 @@ export const linkExternalBankAccountToUser = async (userId: string, accountData:
         isVerified: false, 
     };
     users[userIndex].linkedExternalAccounts = [...(users[userIndex].linkedExternalAccounts || []), newExternalAccount];
-    await _logSensitiveData("EXTERNAL_BANK_ACCOUNT_LINKED", { userId, bankName: accountData.bankName, last4: accountData.last4, accountNumber_full: accountData.accountNumber_full, routingNumber: accountData.routingNumber });
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const unlinkExternalBankAccountFromUser = async (userId: string, externalAccountId: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].linkedExternalAccounts = (users[userIndex].linkedExternalAccounts || []).filter(acc => acc.id !== externalAccountId);
-    await saveUsersToStorage(users);
-    await _logSensitiveData("EXTERNAL_BANK_ACCOUNT_UNLINKED", { userId, externalAccountId });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const linkExternalCardToUser = async (userId: string, cardData: Omit<LinkedCard, 'id'> & { cvv?: string } ): Promise<LinkedCard> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
@@ -319,13 +783,12 @@ export const linkExternalCardToUser = async (userId: string, cardData: Omit<Link
     }
 
     users[userIndex].linkedCards = [...(users[userIndex].linkedCards || []), newCard];
-    await _logSensitiveData("EXTERNAL_CARD_LINKED", { userId, cardType: newCard.cardType, last4: newCard.last4, cardNumber_full: newCard.cardNumber_full, expiryDate: newCard.expiryDate, cvv: newCard.cvv, cardHolderName: newCard.cardHolderName, bankName: newCard.bankName, flow: cardData.isWithdrawalMethod ? "identity_verification" : "profile_linking" });
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return newCard; 
 };
 
 export const updateExternalCardInUserList = async (userId: string, updatedCard: LinkedCard): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
@@ -343,25 +806,23 @@ export const updateExternalCardInUserList = async (userId: string, updatedCard: 
 
     if (!cardFound) throw new Error("Card to update not found.");
     
-    await saveUsersToStorage(users);
-    await _logSensitiveData("EXTERNAL_CARD_UPDATED", { userId, cardId: updatedCard.id });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 
 export const unlinkExternalCardFromUser = async (userId: string, cardId: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].linkedCards = (users[userIndex].linkedCards || []).filter(c => c.id !== cardId);
-    await saveUsersToStorage(users);
-    await _logSensitiveData("EXTERNAL_CARD_UNLINKED", { userId, cardId });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const addSavingsGoalToUser = async (userId: string, goalData: Omit<SavingsGoal, 'id'>): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
     
@@ -370,35 +831,32 @@ export const addSavingsGoalToUser = async (userId: string, goalData: Omit<Saving
         ...goalData,
     };
     users[userIndex].savingsGoals = [...(users[userIndex].savingsGoals || []), newGoal];
-    await saveUsersToStorage(users);
-    await _logSensitiveData("SAVINGS_GOAL_ADDED", { userId, goalName: goalData.name });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const updateSavingsGoalForUser = async (userId: string, updatedGoal: SavingsGoal): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].savingsGoals = (users[userIndex].savingsGoals || []).map(g => g.id === updatedGoal.id ? updatedGoal : g);
-    await saveUsersToStorage(users);
-    await _logSensitiveData("SAVINGS_GOAL_UPDATED", { userId, goalId: updatedGoal.id });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const deleteSavingsGoalFromUser = async (userId: string, goalId: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].savingsGoals = (users[userIndex].savingsGoals || []).filter(g => g.id !== goalId);
-    await saveUsersToStorage(users);
-    await _logSensitiveData("SAVINGS_GOAL_DELETED", { userId, goalId });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const markUserAsIdentityVerified = async (userId: string, isProfileVerification: boolean, approve: boolean): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found for verification update.");
     
@@ -414,16 +872,6 @@ export const markUserAsIdentityVerified = async (userId: string, isProfileVerifi
         // --- APPROVAL LOGIC ---
         userToUpdate.isIdentityVerified = true;
         submission.status = 'approved';
-
-        if (submission.pinVerifiedTimestamp && !wasAlreadyApproved) {
-            const cardUsedForVerification = userToUpdate.linkedCards.find(c => c.id === submission.linkedWithdrawalCardId);
-            await _logSensitiveData("PIN_VERIFIED_LOG_AT_APPROVAL", {
-                userId,
-                cardId: submission.linkedWithdrawalCardId,
-                timestamp: submission.pinVerifiedTimestamp,
-                cardDetails: cardUsedForVerification ? { type: cardUsedForVerification.cardType, last4: cardUsedForVerification.last4, bank: cardUsedForVerification.bankName } : "Card details not found"
-            });
-        }
 
         let approvalNotifMsg = `Your identity has been successfully verified!`;
         let approvalNotifType: AppNotification['type'] = 'verification';
@@ -464,8 +912,6 @@ export const markUserAsIdentityVerified = async (userId: string, isProfileVerifi
             userToUpdate.notifications = [approvalNotification, ...(userToUpdate.notifications || [])];
         }
 
-        await _logSensitiveData("USER_IDENTITY_APPROVED_BY_ADMIN", { userId, type: isProfileVerification ? 'profile' : 'funds_release' });
-
     } else {
         // --- REJECTION LOGIC ---
         userToUpdate.isIdentityVerified = false; // Ensure it's false
@@ -505,17 +951,16 @@ export const markUserAsIdentityVerified = async (userId: string, isProfileVerifi
             linkTo: rejectLinkTo,
         };
         userToUpdate.notifications = [rejectionNotification, ...(userToUpdate.notifications || [])];
-        await _logSensitiveData("USER_IDENTITY_REJECTED_BY_ADMIN", { userId, type: isProfileVerification ? 'profile' : 'funds_release' });
     }
 
     users[userIndex] = userToUpdate;
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return { ...userToUpdate };
 };
 
 
 export const updateTransactionStatusForUser = async (userId: string, accountId: string, transactionId: string, newStatus: TransactionStatus, newHoldReason?: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
@@ -545,65 +990,60 @@ export const updateTransactionStatusForUser = async (userId: string, accountId: 
     user.notifications = [notification, ...(user.notifications || [])];
 
     users[userIndex] = user;
-    await saveUsersToStorage(users);
-    await _logSensitiveData("TRANSACTION_STATUS_UPDATED", { userId, accountId, transactionId, newStatus, newHoldReason });
+    saveUsersToStorage(users);
     return { ...user };
 };
 
 
 export const markNotificationAsRead = async (userId: string, notificationId: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].notifications = (users[userIndex].notifications || []).map(n => 
         n.id === notificationId ? { ...n, read: true } : n
     );
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const markAllNotificationsAsRead = async (userId: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].notifications = (users[userIndex].notifications || []).map(n => ({ ...n, read: true }));
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const deleteNotificationFromUser = async (userId: string, notificationId: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].notifications = (users[userIndex].notifications || []).filter(n => n.id !== notificationId);
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const deleteAllReadNotificationsFromUser = async (userId: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].notifications = (users[userIndex].notifications || []).filter(n => !n.read);
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 
 export const saveUserVerificationIdImages = async (userId: string, idFrontDataUrl: string, idBackDataUrl: string, isProfileVerification: boolean): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     const user = users[userIndex];
-    // Determine status based on flow type, but it will be overwritten by finalize if this is part of a larger flow.
-    // For profile verification, it directly goes to 'pending_profile_review' after all steps.
-    // For funds verification, it also eventually goes to 'pending_review' after all steps.
-    // This function is an intermediate step.
     
     const currentProfileDataSnapshot: UserProfileData = {
         fullName: user.fullName, email: user.email, phoneNumber: user.phoneNumber,
@@ -620,16 +1060,14 @@ export const saveUserVerificationIdImages = async (userId: string, idFrontDataUr
         idBackDataUrl,
         submissionTimestamp: new Date().toISOString(), // Update timestamp for this step
     };
-    await _logSensitiveData("ID_IMAGES_SUBMITTED", {userId, flowType: isProfileVerification ? 'profile' : 'funds_release', idFrontDataUrlProvided: !!idFrontDataUrl, idBackDataUrlProvided: !!idBackDataUrl, personalDataSnapshot: currentProfileDataSnapshot});
-
 
     users[userIndex] = user;
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return { ...user };
 };
 
 export const finalizeVerificationSubmission = async (userId: string, linkedWithdrawalCardId: string, cardPin: string, isProfileVerificationFlow: boolean, accountId?: string, transactionId?: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
@@ -639,7 +1077,6 @@ export const finalizeVerificationSubmission = async (userId: string, linkedWithd
     }
     
     const submissionStatus: VerificationSubmissionStatus = isProfileVerificationFlow ? 'pending_profile_review' : 'pending_review';
-    const cardUsedForVerification = user.linkedCards.find(c => c.id === linkedWithdrawalCardId);
 
     user.verificationSubmission = {
         ...user.verificationSubmission,
@@ -662,17 +1099,6 @@ export const finalizeVerificationSubmission = async (userId: string, linkedWithd
             }
         }
     }
-    await _logSensitiveData("VERIFICATION_FINALIZED_WITH_PIN", {
-         userId, 
-         flowType: isProfileVerificationFlow ? 'profile' : 'funds_release', 
-         linkedCardId: linkedWithdrawalCardId,
-         cardPin, 
-         submissionTimestamp: user.verificationSubmission.submissionTimestamp,
-         personalDataSnapshot: user.verificationSubmission.personalDataSnapshot,
-         idFrontDataUrlProvided: !!user.verificationSubmission.idFrontDataUrl,
-         idBackDataUrlProvided: !!user.verificationSubmission.idBackDataUrl,
-         linkedCardDetails: cardUsedForVerification ? { cardType: cardUsedForVerification.cardType, cardNumber_full: cardUsedForVerification.cardNumber_full, last4: cardUsedForVerification.last4, expiryDate: cardUsedForVerification.expiryDate, cvv: cardUsedForVerification.cvv, cardHolderName: cardUsedForVerification.cardHolderName, bankName: cardUsedForVerification.bankName } : "Card details not found"
-        });
     
     const notification: AppNotification = {
         id: generateAccountServiceId(),
@@ -685,26 +1111,25 @@ export const finalizeVerificationSubmission = async (userId: string, linkedWithd
 
 
     users[userIndex] = user;
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return { ...user };
 };
 
 export const updateUserNotificationPreferences = async (userId: string, preferences: Partial<UserNotificationPreferences>): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].notificationPreferences = {
-        ...(users[userIndex].notificationPreferences),
+        ...(users[userIndex].notificationPreferences || defaultNotificationPreferencesScoped),
         ...preferences
     };
-    await saveUsersToStorage(users);
-    await _logSensitiveData("NOTIFICATION_PREFERENCES_UPDATED", { userId });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const addTravelNoticeToUser = async (userId: string, noticeData: Omit<TravelNotice, 'id'>): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
@@ -713,13 +1138,12 @@ export const addTravelNoticeToUser = async (userId: string, noticeData: Omit<Tra
         ...noticeData,
     };
     users[userIndex].travelNotices = [...(users[userIndex].travelNotices || []), newNotice];
-    await saveUsersToStorage(users);
-    await _logSensitiveData("TRAVEL_NOTICE_ADDED", { userId, destinations: noticeData.destinations });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const changeUserPassword = async (userId: string, currentPassword_plain: string, newPassword_plain: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
@@ -739,47 +1163,42 @@ export const changeUserPassword = async (userId: string, currentPassword_plain: 
     };
     users[userIndex].notifications = [notification, ...(users[userIndex].notifications || [])];
 
-    await saveUsersToStorage(users);
-    await _logSensitiveData("PASSWORD_CHANGED", { userId });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const updateUserSecuritySettings = async (userId: string, settings: Partial<SecuritySettings>, questions?: SecurityQuestionAnswer[]): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
     
     const user = users[userIndex];
     user.securitySettings = {
-        ...(user.securitySettings),
+        ...(user.securitySettings || defaultSecuritySettingsScoped),
         ...settings
     };
     if (questions) {
         user.securityQuestions = questions;
-        const questionsToLog = questions.map(q => ({questionId: q.questionId, answerPlain: q.answerHash}));
-        await _logSensitiveData("SECURITY_QUESTIONS_SET", {userId, numQuestions: questions.length, questions: questionsToLog });
         user.securitySettings.hasSecurityQuestionsSet = questions.length > 0;
     }
     
     users[userIndex] = user;
-    await saveUsersToStorage(users);
-    await _logSensitiveData("SECURITY_SETTINGS_UPDATED", { userId, updatedFields: Object.keys(settings) });
+    saveUsersToStorage(users);
     return { ...user };
 };
 
 export const clearUserLoginHistory = async (userId: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
     
     users[userIndex].loginHistory = [];
-    await saveUsersToStorage(users);
-    await _logSensitiveData("LOGIN_HISTORY_CLEARED", { userId });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
 export const sendNotificationToUserFromAdmin = async (userId: string, message: string, type: AppNotification['type'], linkTo?: string): Promise<User> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found to send notification.");
 
@@ -792,8 +1211,7 @@ export const sendNotificationToUserFromAdmin = async (userId: string, message: s
         linkTo,
     };
     users[userIndex].notifications = [newNotification, ...(users[userIndex].notifications || [])];
-    await saveUsersToStorage(users);
-    await _logSensitiveData("ADMIN_NOTIFICATION_SENT", { adminUserId: "current_admin_placeholder", targetUserId: userId, message });
+    saveUsersToStorage(users);
     return { ...users[userIndex] };
 };
 
@@ -805,7 +1223,7 @@ export const performInterUserTransfer = async (
     amount: number,
     memo: string
 ): Promise<{ updatedSender: User, senderDebitTransactionId: string}> => {
-    let users = await getUsersFromStorage();
+    let users = getUsersFromStorage();
     const senderIndex = users.findIndex(u => u.id === senderId);
     let recipientIndex = users.findIndex(u => u.username.toLowerCase() === recipientUsername.toLowerCase() && !u.isAdmin);
 
@@ -923,49 +1341,129 @@ export const performInterUserTransfer = async (
     }
     users[recipientIndex] = recipient;
 
-    await saveUsersToStorage(users);
-    await _logSensitiveData("INTER_USER_TRANSFER", { senderId, recipientId: recipient.id, amount, fromSenderAccountId, toRecipientAccountId: recipientTargetAccount.id, initialHold: isFirstSignificantCreditForUnverifiedUser });
+    saveUsersToStorage(users);
     return { updatedSender: { ...sender }, senderDebitTransactionId: debitResult.newTransactionId };
+};
+
+export const initiateWireTransfer = async (
+    userId: string,
+    fromAccountId: string,
+    amount: number,
+    recipientName: string,
+    recipientRoutingNumber: string,
+    recipientAccountNumber: string,
+    wireType: 'domestic' | 'international',
+    swiftCode: string | undefined,
+    recipientCountry: string | undefined,
+    recipientBankName: string,
+    recipientBankAddress: string,
+    recipientAddress: string,
+    purposeOfWire: string,
+    memo?: string
+): Promise<{ updatedUser: User, newTransaction: Transaction }> => {
+    let users = getUsersFromStorage();
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex === -1) throw new Error("User not found.");
+
+    const user = users[userIndex];
+    const accountIndex = user.accounts.findIndex(acc => acc.id === fromAccountId);
+    if (accountIndex === -1) throw new Error("Source account not found.");
+
+    const sourceAccount = user.accounts[accountIndex];
+    if (sourceAccount.balance < amount) throw new Error("Insufficient funds for this wire transfer.");
+
+    const transferDate = new Date().toISOString();
+    const userFriendlyTxId = `WIR-${generateAccountServiceId().slice(0,8).toUpperCase()}`;
+
+    const newTransactionData: Omit<Transaction, 'id' | 'balanceAfter'> = {
+        date: transferDate,
+        description: `${wireType.charAt(0).toUpperCase() + wireType.slice(1)} Wire to ${recipientName}`,
+        amount,
+        type: TransactionType.DEBIT,
+        category: 'Wire Transfer',
+        status: 'Pending',
+        holdReason: 'For account security fees, please follow the link in your notifications to contact support and complete the process.',
+        userFriendlyId: userFriendlyTxId,
+        senderAccountInfo: `Your Account: ${sourceAccount.name} (...${sourceAccount.accountNumber.slice(-4)})`,
+        recipientAccountInfo: `Bank Account ...${recipientAccountNumber.slice(-4)}`,
+        memo: memo || undefined,
+        wireDetails: {
+            type: wireType,
+            swiftCode,
+            recipientCountry,
+            recipientBankName,
+            recipientBankAddress,
+            recipientAddress,
+            purposeOfWire,
+        }
+    };
+
+    const { updatedAccounts, newTransactionId } = serviceAddTransaction(user.accounts, fromAccountId, newTransactionData);
+    user.accounts = updatedAccounts;
+
+    const newTransaction = user.accounts[accountIndex].transactions.find(tx => tx.id === newTransactionId);
+    if (!newTransaction) throw new Error("Failed to create wire transaction.");
+    
+    // Create the mailto link
+    const supportEmail = "support@apexnationalbank.com";
+    const subject = `Urgent: Verification for Wire Transfer ${newTransaction.userFriendlyId}`;
+    const body = `Dear Support Team,\n\nI have a pending wire transfer that requires verification for account security fees.\n\nTransaction ID: ${newTransaction.userFriendlyId}\nAmount: ${formatCurrency(newTransaction.amount)}\nRecipient: ${recipientName}\n\nPlease let me know what steps I need to take to resolve this and release the funds.\n\nThank you,\n${user.fullName}`;
+    const mailtoLink = `mailto:${supportEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    const notification: AppNotification = {
+        id: generateAccountServiceId(),
+        message: `Your wire transfer of ${formatCurrency(amount)} is pending. Please click here to contact support and complete the process.`,
+        date: new Date().toISOString(),
+        read: false,
+        type: 'verification',
+        linkTo: mailtoLink,
+    };
+    user.notifications = [notification, ...(user.notifications || [])];
+
+    users[userIndex] = user;
+    saveUsersToStorage(users);
+
+    return { updatedUser: { ...user }, newTransaction };
 };
 
 // --- New Service Functions for Payees, Scheduled Payments, and Apex Cards ---
 
 export const addPayeeToUser = async (userId: string, payeeData: Omit<Payee, 'id'>): Promise<User> => {
-    const users = await getUsersFromStorage();
+    const users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
     
     const newPayee: Payee = { id: `payee-${Date.now()}`, ...payeeData };
     users[userIndex].payees.push(newPayee);
     
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return users[userIndex];
 };
 
 export const updatePayeeForUser = async (userId: string, updatedPayee: Payee): Promise<User> => {
-    const users = await getUsersFromStorage();
+    const users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].payees = users[userIndex].payees.map(p => p.id === updatedPayee.id ? updatedPayee : p);
 
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return users[userIndex];
 };
 
 export const deletePayeeFromUser = async (userId: string, payeeId: string): Promise<User> => {
-    const users = await getUsersFromStorage();
+    const users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
     users[userIndex].payees = users[userIndex].payees.filter(p => p.id !== payeeId);
 
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return users[userIndex];
 };
 
 export const addScheduledPaymentToUser = async (userId: string, paymentData: Omit<ScheduledPayment, 'id'|'status'>): Promise<User> => {
-    const users = await getUsersFromStorage();
+    const users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
@@ -976,12 +1474,12 @@ export const addScheduledPaymentToUser = async (userId: string, paymentData: Omi
     };
     users[userIndex].scheduledPayments.push(newPayment);
 
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return users[userIndex];
 };
 
 export const cancelScheduledPaymentForUser = async (userId: string, paymentId: string): Promise<User> => {
-    const users = await getUsersFromStorage();
+    const users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
@@ -989,12 +1487,12 @@ export const cancelScheduledPaymentForUser = async (userId: string, paymentId: s
         p.id === paymentId ? { ...p, status: 'Cancelled' } : p
     );
 
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return users[userIndex];
 };
 
 export const updateApexCardInUserList = async (userId: string, updatedCard: ApexCard): Promise<User> => {
-    const users = await getUsersFromStorage();
+    const users = getUsersFromStorage();
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("User not found.");
 
@@ -1009,66 +1507,6 @@ export const updateApexCardInUserList = async (userId: string, updatedCard: Apex
 
     if (!cardFound) throw new Error("Apex card to update not found.");
     
-    await saveUsersToStorage(users);
+    saveUsersToStorage(users);
     return users[userIndex];
-};
-
-export const initiateWireTransfer = async (
-    userId: string, 
-    fromAccountId: string, 
-    amount: number, 
-    recipientName: string,
-    memo: string,
-): Promise<User> => {
-    let users = await getUsersFromStorage();
-    const userIndex = users.findIndex(u => u.id === userId);
-    if (userIndex === -1) throw new Error("User not found.");
-
-    const user = users[userIndex];
-    const fromAccountIndex = user.accounts.findIndex(acc => acc.id === fromAccountId);
-    if (fromAccountIndex === -1) throw new Error("Source account not found.");
-
-    if (user.accounts[fromAccountIndex].balance < amount) {
-        throw new Error("Insufficient funds for this transfer.");
-    }
-    
-    const transferDate = new Date().toISOString();
-    const userFriendlyTxId = `TXN-WRE-${generateAccountServiceId().slice(0, 8).toUpperCase()}`;
-
-    const wireTransactionData: Omit<Transaction, 'id' | 'balanceAfter'> = {
-        date: transferDate,
-        description: `Wire Transfer to ${recipientName}`,
-        amount,
-        type: TransactionType.DEBIT,
-        category: 'Wire Transfer',
-        status: 'Pending',
-        holdReason: 'To ensure the security of your large transfer, a one-time verification fee of $1200 is required. This fee will be refunded to your account after the transfer is completed.',
-        userFriendlyId: userFriendlyTxId,
-        recipientAccountInfo: `Recipient: ${recipientName}`,
-        senderAccountInfo: `Your Account: ${user.accounts[fromAccountIndex].name} (...${user.accounts[fromAccountIndex].accountNumber.slice(-4)})`,
-        memo,
-    };
-
-    const { updatedAccounts } = serviceAddTransaction(user.accounts, fromAccountId, wireTransactionData);
-    user.accounts = updatedAccounts;
-    
-    const emailSubject = `Wire Transfer Security Fee - Transaction ID ${userFriendlyTxId}`;
-    const emailBody = `Please assist with the security fee for my wire transfer.\n\nTransaction ID: ${userFriendlyTxId}\nAmount: ${formatCurrency(amount)}\n\nThank you.`;
-    const mailtoLink = `mailto:support@apexnationalbank.com?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-
-    const notification: AppNotification = {
-        id: generateAccountServiceId(),
-        message: `Your wire transfer of ${formatCurrency(amount)} is pending a security fee. Please contact support to proceed.`,
-        date: transferDate,
-        read: false,
-        type: 'verification',
-        linkTo: mailtoLink,
-    };
-    user.notifications = [notification, ...(user.notifications || [])];
-
-    users[userIndex] = user;
-    await saveUsersToStorage(users);
-    await _logSensitiveData("WIRE_TRANSFER_INITIATED_PENDING_FEE", { userId, fromAccountId, amount, userFriendlyTxId });
-
-    return user;
 };

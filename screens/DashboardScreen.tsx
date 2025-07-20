@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import AccountCard from '../components/AccountCard';
@@ -13,8 +14,6 @@ import {
     PlusCircleIcon, ArrowPathIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, CameraIcon, StarIcon,
     GiftIcon, CurrencyDollarIcon, ShieldCheckIcon, TrophyIcon, SparklesIcon, InformationCircleIcon
 } from '../constants';
-
-const API_KEY = process.env.API_KEY;
 
 const DashboardScreen: React.FC = () => {
   const { loading: accountsLoading, error: accountsError } = useAccounts(); 
@@ -38,7 +37,7 @@ const DashboardScreen: React.FC = () => {
 
 
   const handleGenerateSnapshot = async () => {
-      if (!API_KEY) {
+      if (!process.env.API_KEY) {
         setSnapshotError("This AI feature is currently unavailable due to a missing API key configuration.");
         return;
       }
@@ -47,7 +46,7 @@ const DashboardScreen: React.FC = () => {
       setSnapshot(null);
 
       try {
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
